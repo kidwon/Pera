@@ -24,6 +24,11 @@ export const translations = {
         easy: "简单",
         nextReview: "下次复习",
         level: "成熟度",
+        searchTab: "搜索",
+        myCardsTab: "我的卡片",
+        remove: "移除",
+        confirmRemove: "确定移除吗？",
+        noSavedCards: "还没有保存的卡片。",
     },
     en: {
         appName: "PeraPera",
@@ -48,5 +53,10 @@ export const translations = {
         easy: "Easy",
         nextReview: "Next Review",
         level: "Level",
+        searchTab: "Search",
+        myCardsTab: "My Cards",
+        remove: "Remove",
+        confirmRemove: "Are you sure you want to remove this card?",
+        noSavedCards: "No cards saved yet.",
     },
 };

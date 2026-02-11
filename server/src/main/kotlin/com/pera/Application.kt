@@ -18,7 +18,6 @@ fun main() {
 
 fun Application.module() {
     install(CORS) {
-        anyHost()
         allowMethod(HttpMethod.Options)
         allowMethod(HttpMethod.Get)
         allowMethod(HttpMethod.Post)
@@ -28,7 +27,19 @@ fun Application.module() {
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.AccessControlAllowOrigin)
+        // allowHeader("ngrok-skip-browser-warning") // helpful if using ngrok
+        
+        // Explicitly allow the origins
+        allowHost("kidwon.github.io", schemes = listOf("https"))
+        allowHost("localhost:3000", schemes = listOf("http"))
+        allowHost("localhost:3100", schemes = listOf("http"))
+        
+        // Allow all subdomain for trycloudflare
+        allowHost("*.trycloudflare.com", schemes = listOf("https"))
+        
+        allowNonSimpleContentTypes = true
         allowCredentials = true
+        anyHost() 
     }
     install(ContentNegotiation) {
         json(Json {

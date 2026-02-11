@@ -225,3 +225,37 @@ export const deleteAllCards = mutation({
         return cards.length;
     },
 });
+
+export const getAllCards = query({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        let user = null;
+        if (identity) {
+            user = await ctx.db
+                .query("users")
+                .withIndex("by_token", (q) =>
+                    q.eq("tokenIdentifier", identity.tokenIdentifier)
+                )
+                .unique();
+        }
+        if (!user) {
+            user = await ctx.db.query("users").first();
+        }
+        if (!user) return [];
+
+        return await ctx.db
+            .query("cards")
+            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .collect();
+    },
+});
+
+export const removeCard = mutation({
+    args: { cardId: v.id("cards") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        // Permission check skipped for dev, but we could add it here
+        await ctx.db.delete(args.cardId);
+    },
+});

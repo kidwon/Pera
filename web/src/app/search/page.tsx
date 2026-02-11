@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useMutation } from "convex/react";
+import { useState, useEffect, useMemo } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Check, Volume2 } from "lucide-react";
+import { Plus, Check, Volume2, Trash2 } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { SimpleDialog } from "@/components/ui/simple-dialog";
 import { YouGlishPlayer } from "@/components/YouGlishPlayer";
 import { useLanguage } from "@/app/LanguageProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SearchResult {
     ent_seq: string;
@@ -32,12 +33,25 @@ export default function SearchPage() {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
-    const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
     const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
     const [showVideo, setShowVideo] = useState(false);
+    const [activeTab, setActiveTab] = useState("search");
 
     const addCard = useMutation(api.cards.addCard);
+    const removeCard = useMutation(api.cards.removeCard);
+    const myCards = useQuery(api.cards.getAllCards);
     const { speak } = useTTS();
+
+    // Sync added state with backend data
+    const addedKeys = useMemo(() => {
+        const keys = new Set<string>();
+        if (myCards) {
+            myCards.forEach(card => {
+                keys.add(`${card.ent_seq}:${card.meaningIndex}`);
+            });
+        }
+        return keys;
+    }, [myCards]);
 
     useEffect(() => {
         const searchDictionary = async () => {
@@ -69,7 +83,6 @@ export default function SearchPage() {
     }, [query]);
 
     const handleAddMeaning = async (result: SearchResult, meaningIndex: number) => {
-        const key = `${result.ent_seq}:${meaningIndex}`;
         try {
             await addCard({
                 ent_seq: result.ent_seq,
@@ -79,7 +92,6 @@ export default function SearchPage() {
                 pitch: result.pitch ?? undefined,
                 meaningIndex: meaningIndex,
             });
-            setAddedKeys((prev) => new Set(prev).add(key));
         } catch (error) {
             console.error("Failed to add card:", error);
             // @ts-ignore
@@ -88,31 +100,15 @@ export default function SearchPage() {
         }
     };
 
-    const handleAddAll = async (result: SearchResult) => {
-        try {
-            // Add all meanings as separate cards
-            for (let i = 0; i < result.meanings.length; i++) {
-                const key = `${result.ent_seq}:${i}`;
-                if (!addedKeys.has(key)) {
-                    await addCard({
-                        ent_seq: result.ent_seq,
-                        kanji: result.kanji,
-                        reading: result.reading,
-                        meanings: [result.meanings[i]], // Pass specific meaning object
-                        pitch: result.pitch ?? undefined,
-                        meaningIndex: i,
-                    });
-                    setAddedKeys((prev) => new Set(prev).add(key));
-                }
+    const handleRemoveCard = async (cardId: any, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (confirm(t.confirmRemove || "Remove this card?")) {
+            try {
+                await removeCard({ cardId });
+            } catch (error) {
+                console.error("Failed to remove card:", error);
             }
-        } catch (error) {
-            console.error("Failed to add cards:", error);
-            alert("Failed to add cards. Make sure you are logged in (or using Dev Admin).");
         }
-    };
-
-    const isAllAdded = (result: SearchResult) => {
-        return result.meanings.every((_, i) => addedKeys.has(`${result.ent_seq}:${i}`));
     };
 
     const handleCardClick = (result: SearchResult) => {
@@ -132,52 +128,134 @@ export default function SearchPage() {
                 <LanguageSwitcher />
             </div>
 
-            <div className="sticky top-0 bg-background/95 backdrop-blur py-4 z-10">
-                <Input
-                    placeholder={t.searchPlaceholder}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="text-lg h-12"
-                    autoFocus
-                />
-            </div>
+            <Tabs defaultValue="search" value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="search">{t.searchTab}</TabsTrigger>
+                    <TabsTrigger value="myCards">{t.myCardsTab}</TabsTrigger>
+                </TabsList>
 
-            <div className="mt-4 space-y-4">
-                {loading && <div className="text-center text-muted-foreground animate-pulse">...</div>}
+                <TabsContent value="search" className="mt-0">
+                    <div className="sticky top-0 bg-background/95 backdrop-blur py-4 z-10">
+                        <Input
+                            placeholder={t.searchPlaceholder}
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            className="text-lg h-12"
+                            autoFocus
+                        />
+                    </div>
 
-                {!loading && results.length === 0 && query.trim() !== "" && (
-                    <div className="text-center text-muted-foreground">{t.noCards}</div>
-                )}
+                    <div className="mt-4 space-y-4">
+                        {loading && <div className="text-center text-muted-foreground animate-pulse">...</div>}
 
-                {results.map((result) => (
-                    <Card
-                        key={result.ent_seq}
-                        className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => handleCardClick(result)}
-                    >
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-2xl font-bold text-primary">
-                                        {result.kanji || result.reading}
-                                    </span>
-                                    {result.kanji && result.reading && (
-                                        <span className="text-sm text-muted-foreground">
-                                            ({result.reading}{result.pitch ? ` [${result.pitch}]` : ""})
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="text-muted-foreground">
-                                    <Volume2 className="h-4 w-4" />
-                                </div>
+                        {!loading && results.length === 0 && query.trim() !== "" && (
+                            <div className="text-center text-muted-foreground">{t.noCards}</div>
+                        )}
+
+                        {results.map((result) => {
+                            const isAdded = addedKeys.has(`${result.ent_seq}:0`);
+                            return (
+                                <Card
+                                    key={result.ent_seq}
+                                    className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                                    onClick={() => handleCardClick(result)}
+                                >
+                                    <CardContent className="p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-2xl font-bold text-primary">
+                                                    {result.kanji || result.reading}
+                                                </span>
+                                                {result.kanji && result.reading && (
+                                                    <span className="text-sm text-muted-foreground">
+                                                        ({result.reading}{result.pitch ? ` [${result.pitch}]` : ""})
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    disabled={isAdded}
+                                                    className={`h-8 w-8 ${isAdded ? "text-primary opacity-50" : "text-muted-foreground hover:text-primary"}`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (!isAdded) {
+                                                            handleAddMeaning(result, 0);
+                                                        }
+                                                    }}
+                                                >
+                                                    {isAdded ? <Check className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        speak(result.reading || result.kanji || "");
+                                                    }}
+                                                >
+                                                    <Volume2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="text-sm text-muted-foreground line-clamp-2">
+                                            {result.meanings.map(m => m.gloss).join("; ")}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="myCards" className="mt-0">
+                    <div className="mt-4 space-y-4">
+                        {myCards === undefined && <div className="text-center text-muted-foreground animate-pulse">...</div>}
+
+                        {myCards && myCards.length === 0 && (
+                            <div className="text-center py-10 text-muted-foreground">
+                                {t.noSavedCards}
                             </div>
-                            <div className="text-sm text-muted-foreground line-clamp-2">
-                                {result.meanings.map(m => m.gloss).join("; ")}
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+                        )}
+
+                        {myCards?.map((card) => (
+                            <Card
+                                key={card._id}
+                                className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer relative group"
+                                onClick={() => handleCardClick(card as any)}
+                            >
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xl font-bold text-primary">
+                                                {card.kanji || card.reading}
+                                            </span>
+                                            {card.kanji && card.reading && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    ({card.reading})
+                                                </span>
+                                            )}
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-destructive transition-opacity"
+                                            onClick={(e) => handleRemoveCard(card._id, e)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        {card.meanings.map(m => m.gloss).join("; ")}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </TabsContent>
+            </Tabs>
 
             {/* Detail View Dialog */}
             {selectedResult && (
