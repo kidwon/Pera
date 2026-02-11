@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,93790,e=>{"use strict";var t=e.i(43476);e.i(50711);var c=e.i(82045);let o=new c.ConvexReactClient("https://focused-peacock-603.convex.cloud");function i({children:e}){return(0,t.jsx)(c.ConvexProvider,{client:o,children:e})}e.s(["default",()=>i])}]);
