@@ -53,13 +53,21 @@ fun Application.module() {
 
 fun Application.configureRouting() {
     // Load dictionary once at startup
+    // Load dictionary once at startup
     val processor = DictionaryProcessor()
-    val file = java.io.File("src/main/resources/jmdict_dummy.xml")
-    val dictionaryEntries = if (file.exists()) {
-        println("Loading dictionary from ${file.absolutePath}...")
-        processor.parseDictionary(file.readText())
-    } else {
-        println("Dictionary file not found at ${file.absolutePath}")
+    // Use classpath resource loading
+    val dictionaryEntries = try {
+        val resource = Application::class.java.getResource("/jmdict_dummy.xml")
+        if (resource != null) {
+            println("Loading dictionary from ${resource.path}...")
+            processor.parseDictionary(resource.readText())
+        } else {
+            println("Dictionary file not found in classpath")
+            emptyList()
+        }
+    } catch (e: Exception) {
+        println("Error loading dictionary: ${e.message}")
+        e.printStackTrace()
         emptyList()
     }
 
@@ -72,6 +80,9 @@ fun Application.configureRouting() {
         }
         get("/api/dictionary/seed") {
             call.respond(dictionaryEntries)
+        }
+        get("/api/debug/stats") {
+            call.respond(processor.getJlptStats())
         }
         get("/api/dictionary/search") {
             val query = call.request.queryParameters["q"]

@@ -9,6 +9,7 @@ server/.gradle_homeexport/
 server/build/
 server/server/ 
 server/debug.log
+server/run_log.txt
 server/tmp*/
 server/*.tar.gz
 server/*.zip

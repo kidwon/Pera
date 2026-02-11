@@ -1,13 +1,55 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-// Trigger rebuild 3
+
+// Diagnostic Identifier
+const VERSION_ID = "DEBUG_V5_STABLE";
+
+// Minimal test mutation - no args, just returns version
+export const testPing = mutation({
+    args: {},
+    handler: async () => {
+        console.log(`[PING] Version: ${VERSION_ID}`);
+        return `PONG: ${VERSION_ID}`;
+    },
+});
+
+// Minimal seed with just one hardcoded card - for testing
+export const seedOne = mutation({
+    args: {},
+    handler: async (ctx) => {
+        console.log(`[SEED_ONE] Starting. Version: ${VERSION_ID}`);
+        let user = await ctx.db.query("users").first();
+        if (!user) {
+            const userId = await ctx.db.insert("users", {
+                name: "Dev Admin",
+                tokenIdentifier: "dev-admin-token",
+            });
+            user = await ctx.db.get(userId);
+        }
+        if (!user) return "ERROR: no user";
+
+        await ctx.db.insert("cards", {
+            userId: user._id,
+            ent_seq: "test_" + Date.now(),
+            kanji: "テスト",
+            reading: "てすと",
+            meanings: [{ gloss: "test" }],
+            pitch: "0",
+            jlptLevel: "N5",
+            meaningIndex: 0,
+            srs_stage: 0,
+            next_review: Date.now(),
+            interval: 0,
+            ease_factor: 2.5,
+        });
+        return `${VERSION_ID} | seedOne OK`;
+    },
+});
 
 export const getDueCards = query({
     args: { limit: v.optional(v.number()) },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-
-        // Try to find user by identity
         let user = null;
         if (identity) {
             user = await ctx.db
@@ -17,14 +59,10 @@ export const getDueCards = query({
                 )
                 .unique();
         }
-
-        // Dev fallback: use first user if unauthenticated
         if (!user) {
-            console.log("getDueCards: No auth, using first user found.");
             user = await ctx.db.query("users").first();
         }
-
-        if (!user) throw new Error("User not found (please log in or create a user first)");
+        if (!user) throw new Error("User not found");
 
         const now = Date.now();
         const limit = args.limit ?? 20;
@@ -32,7 +70,7 @@ export const getDueCards = query({
         const cards = await ctx.db
             .query("cards")
             .withIndex("by_user_next_review", (q) =>
-                q.eq("userId", user._id).lte("next_review", now)
+                q.eq("userId", user!._id).lte("next_review", now)
             )
             .take(limit);
 
@@ -60,59 +98,32 @@ export const addCard = mutation({
                 })
             )
         ),
-        pitch: v.optional(v.string()),
-        meaningIndex: v.optional(v.number()), // Which meaning this card represents
+        pitch: v.optional(v.union(v.string(), v.null())),
+        meaningIndex: v.optional(v.union(v.number(), v.null())),
+        jlptLevel: v.optional(v.union(v.string(), v.null())),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-
-        // Try to find user by identity
-        let user = null;
-        if (identity) {
-            user = await ctx.db
-                .query("users")
-                .withIndex("by_token", (q) =>
-                    q.eq("tokenIdentifier", identity.tokenIdentifier)
-                )
-                .unique();
-        }
-
-        // Dev fallback: use first user if unauthenticated
+        let user = await ctx.db.query("users").first();
         if (!user) {
-            console.log("addCard: No auth, using first user found.");
-            user = await ctx.db.query("users").first();
-        }
-
-        if (!user) {
-            // Create Dev Admin if absolutely no users exist (edge case)
-            console.log("addCard: No users found, creating Dev Admin.");
             const userId = await ctx.db.insert("users", {
                 name: "Dev Admin",
                 tokenIdentifier: "dev-admin-token",
             });
             user = await ctx.db.get(userId);
         }
+        if (!user) throw new Error("User not found");
 
-        if (!user) throw new Error("User not found (please log in or create a user first)");
-
-        // Check if card already exists (same ent_seq AND meaningIndex)
         const existingCards = await ctx.db
             .query("cards")
-            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .withIndex("by_user", (q) => q.eq("userId", user!._id))
             .filter((q) => q.eq(q.field("ent_seq"), args.ent_seq))
             .collect();
 
-        // If meaningIndex is provided, check for exact match
         if (args.meaningIndex !== undefined) {
             const existing = existingCards.find(c => c.meaningIndex === args.meaningIndex);
-            if (existing) {
-                return existing._id;
-            }
-        } else {
-            // Legacy behavior: if no meaningIndex, check if any card exists for this ent_seq
-            if (existingCards.length > 0) {
-                return existingCards[0]._id;
-            }
+            if (existing) return existing._id;
+        } else if (existingCards.length > 0) {
+            return existingCards[0]._id;
         }
 
         return await ctx.db.insert("cards", {
@@ -121,8 +132,9 @@ export const addCard = mutation({
             kanji: args.kanji ?? null,
             reading: args.reading ?? null,
             meanings: args.meanings ?? [],
-            pitch: args.pitch,
-            meaningIndex: args.meaningIndex,
+            pitch: args.pitch ?? null,
+            meaningIndex: args.meaningIndex ?? 0,
+            jlptLevel: args.jlptLevel ?? null,
             srs_stage: 0,
             next_review: Date.now(),
             interval: 0,
@@ -133,85 +145,77 @@ export const addCard = mutation({
 
 export const seed = mutation({
     args: {
-        cards: v.array(
-            v.object({
-                ent_seq: v.string(),
-                kanji: v.union(v.string(), v.null()),
-                reading: v.union(v.string(), v.null()),
-                meanings: v.array(
-                    v.object({
-                        gloss: v.string(),
-                        examples: v.optional(
-                            v.array(
-                                v.object({
-                                    text: v.string(),
-                                    text_ja: v.string(),
-                                })
-                            )
-                        ),
-                    })
-                ),
-                pitch: v.optional(v.union(v.string(), v.null())),
-            })
-        ),
+        json: v.string(),
     },
     handler: async (ctx, args) => {
-        // ... (auth logic skipped for brevity in replacement, but kept in file) ...
-        const identity = await ctx.auth.getUserIdentity();
-
-        let user = null;
-        if (identity) {
-            user = await ctx.db
-                .query("users")
-                .withIndex("by_token", (q) =>
-                    q.eq("tokenIdentifier", identity.tokenIdentifier)
-                )
-                .unique();
-        }
-
-        // Dev fallback: use first user if unauthenticated
-        if (!user) {
-            console.log("Seeding: No auth, using first user found.");
-            user = await ctx.db.query("users").first();
-
+        console.log(`[SEED] Mutation Invoked. VERSION: ${VERSION_ID}`);
+        try {
+            const cardsData = JSON.parse(args.json);
+            let user = await ctx.db.query("users").first();
             if (!user) {
-                console.log("Seeding: No users found, creating Dev Admin.");
                 const userId = await ctx.db.insert("users", {
                     name: "Dev Admin",
                     tokenIdentifier: "dev-admin-token",
                 });
                 user = await ctx.db.get(userId);
             }
-        }
+            if (!user) throw new Error("No user context");
 
-        if (!user) throw new Error("User not found (please log in or create a user first)");
+            let count = 0;
+            let errors = 0;
+            let skipped = 0;
 
-        let count = 0;
-        for (const card of args.cards) {
-            // Check if exists
-            const existing = await ctx.db
-                .query("cards")
-                .withIndex("by_user", (q) => q.eq("userId", user._id))
-                .filter((q) => q.eq(q.field("ent_seq"), card.ent_seq))
-                .first();
+            for (const rawCard of cardsData) {
+                try {
+                    const ent_seq = String(rawCard.ent_seq || "");
+                    if (!ent_seq) {
+                        skipped++;
+                        continue;
+                    }
 
-            if (!existing) {
-                await ctx.db.insert("cards", {
-                    userId: user._id,
-                    ent_seq: card.ent_seq,
-                    kanji: card.kanji,
-                    reading: card.reading,
-                    meanings: card.meanings,
-                    pitch: card.pitch ?? undefined,
-                    srs_stage: 0,
-                    next_review: Date.now(),
-                    interval: 0,
-                    ease_factor: 2.5,
-                });
-                count++;
+                    const existing = await ctx.db
+                        .query("cards")
+                        .withIndex("by_user_ent_seq", (q) =>
+                            q.eq("userId", user!._id).eq("ent_seq", ent_seq)
+                        )
+                        .first();
+
+                    if (!existing) {
+                        await ctx.db.insert("cards", {
+                            userId: user._id,
+                            ent_seq: ent_seq,
+                            kanji: typeof rawCard.kanji === 'string' ? rawCard.kanji : null,
+                            reading: typeof rawCard.reading === 'string' ? rawCard.reading : null,
+                            meanings: Array.isArray(rawCard.meanings) ? rawCard.meanings.map((m: any) => ({
+                                gloss: String(m.gloss || "no gloss"),
+                                examples: Array.isArray(m.examples) ? m.examples.map((ex: any) => ({
+                                    text: String(ex.text || ""),
+                                    text_ja: String(ex.text_ja || ""),
+                                })) : [],
+                            })) : [],
+                            pitch: typeof rawCard.pitch === 'string' ? rawCard.pitch : null,
+                            jlptLevel: typeof rawCard.jlptLevel === 'string' ? rawCard.jlptLevel : null,
+                            meaningIndex: 0,
+                            srs_stage: 0,
+                            next_review: Date.now(),
+                            interval: 0,
+                            ease_factor: 2.5,
+                        });
+                        count++;
+                    } else {
+                        skipped++;
+                    }
+                } catch (cardErr: any) {
+                    console.error(`[SEED] Card Error (${rawCard.ent_seq}):`, cardErr.message);
+                    errors++;
+                }
             }
+
+            return `${VERSION_ID} | Created: ${count}, Skipped: ${skipped}, Errors: ${errors}`;
+        } catch (e: any) {
+            console.error("[SEED] Fatal Crash:", e);
+            return `FATAL: ${e.message}`;
         }
-        return count;
     },
 });
 
@@ -229,24 +233,11 @@ export const deleteAllCards = mutation({
 export const getAllCards = query({
     args: {},
     handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        let user = null;
-        if (identity) {
-            user = await ctx.db
-                .query("users")
-                .withIndex("by_token", (q) =>
-                    q.eq("tokenIdentifier", identity.tokenIdentifier)
-                )
-                .unique();
-        }
-        if (!user) {
-            user = await ctx.db.query("users").first();
-        }
+        let user = await ctx.db.query("users").first();
         if (!user) return [];
-
         return await ctx.db
             .query("cards")
-            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .withIndex("by_user", (q) => q.eq("userId", user!._id))
             .collect();
     },
 });
@@ -254,8 +245,6 @@ export const getAllCards = query({
 export const removeCard = mutation({
     args: { cardId: v.id("cards") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        // Permission check skipped for dev, but we could add it here
         await ctx.db.delete(args.cardId);
     },
 });

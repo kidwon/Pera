@@ -25,13 +25,15 @@ export default defineSchema({
                 ),
             })
         ),
-        pitch: v.optional(v.string()), // Pitch accent (0, 1, 2...)
-        meaningIndex: v.optional(v.number()), // Which meaning this card represents
+        pitch: v.optional(v.union(v.string(), v.null())), // Pitch accent (0, 1, 2...)
+        meaningIndex: v.optional(v.union(v.number(), v.null())), // Which meaning this card represents
         srs_stage: v.number(), // 0-8 (Anki/SM-2 stages)
         next_review: v.number(), // Timestamp
         interval: v.number(), // Days
         ease_factor: v.number(), // Multiplier
+        jlptLevel: v.optional(v.union(v.string(), v.null())), // N5, N4, etc.
     })
         .index("by_user", ["userId"])
+        .index("by_user_ent_seq", ["userId", "ent_seq"])
         .index("by_user_next_review", ["userId", "next_review"]), // For fetching due cards
 });

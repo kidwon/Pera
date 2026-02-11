@@ -27,7 +27,19 @@ interface SearchResult {
         }[];
     }[];
     pitch?: string;
+    jlptLevel?: string;
 }
+
+const getJlptColor = (level?: string) => {
+    switch (level?.toUpperCase()) {
+        case 'N5': return "bg-blue-100 text-blue-800 border-blue-200";
+        case 'N4': return "bg-green-100 text-green-800 border-green-200";
+        case 'N3': return "bg-yellow-100 text-yellow-800 border-yellow-200";
+        case 'N2': return "bg-orange-100 text-orange-800 border-orange-200";
+        case 'N1': return "bg-red-100 text-red-800 border-red-200";
+        default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+};
 
 // Animation variants
 const containerVariants = {
@@ -108,6 +120,7 @@ export default function SearchPage() {
                 meanings: [result.meanings[meaningIndex]], // Single meaning
                 pitch: result.pitch ?? undefined,
                 meaningIndex: meaningIndex,
+                jlptLevel: result.jlptLevel,
             });
         } catch (error) {
             console.error("Failed to add card:", error);
@@ -188,6 +201,11 @@ export default function SearchPage() {
                                                         ({result.reading}{result.pitch ? ` [${result.pitch}]` : ""})
                                                     </span>
                                                 )}
+                                                {result.jlptLevel && (
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${getJlptColor(result.jlptLevel)}`}>
+                                                        {result.jlptLevel}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Button
@@ -263,11 +281,18 @@ export default function SearchPage() {
                                                         <span className="text-xl font-bold text-primary">
                                                             {card.kanji || card.reading}
                                                         </span>
-                                                        {card.kanji && card.reading && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                ({card.reading})
-                                                            </span>
-                                                        )}
+                                                        <div className="flex items-baseline gap-2">
+                                                            {card.kanji && card.reading && (
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    ({card.reading})
+                                                                </span>
+                                                            )}
+                                                            {card.jlptLevel && (
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${getJlptColor(card.jlptLevel)}`}>
+                                                                    {card.jlptLevel}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <Button
                                                         variant="ghost"
@@ -307,6 +332,11 @@ export default function SearchPage() {
                             <div className="text-xl text-muted-foreground flex items-center justify-center gap-2">
                                 {selectedResult.reading}
                                 {selectedResult.pitch && <span className="text-sm border px-1 rounded">{selectedResult.pitch}</span>}
+                                {selectedResult.jlptLevel && (
+                                    <span className={`text-sm px-2 py-0.5 rounded-full border font-medium ${getJlptColor(selectedResult.jlptLevel)}`}>
+                                        {selectedResult.jlptLevel}
+                                    </span>
+                                )}
                                 <Button
                                     variant="ghost"
                                     size="icon"

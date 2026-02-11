@@ -62,7 +62,8 @@ data class SimplifiedEntry(
     val kanji: String?,
     val reading: String?,
     val meanings: List<MeaningDetail>, // Changed from List<String>
-    val pitch: String?
+    val pitch: String?,
+    val jlptLevel: String? = null // New field
 )
 
 @Serializable
@@ -80,6 +81,35 @@ data class ExamplePair(
 class DictionaryProcessor {
     private val xmlMapper = XmlMapper().apply {
         registerKotlinModule()
+    }
+    
+    // Map: Kanji/Word -> Level (e.g. "猫" -> "N5")
+    private var jlptMap: Map<String, String> = emptyMap()
+
+    init {
+        loadJlptData()
+    }
+
+    private fun loadJlptData() {
+        try {
+            // Load from classpath: "/jlpt_vocab.json"
+            val resource = javaClass.getResource("/jlpt_vocab.json")
+            if (resource != null) {
+                val jsonContent = resource.readText()
+                val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                // Simple map: "Word" -> "Level"
+                jlptMap = mapper.readValue(
+                        jsonContent, 
+                        object : com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                )
+                println("Loaded ${jlptMap.size} JLPT entries")
+            } else {
+                println("JLPT file not found in classpath: /jlpt_vocab.json")
+            }
+        } catch (e: Exception) {
+            println("Failed to load JLPT data: ${e.message}")
+            e.printStackTrace()
+        }
     }
 
     fun parseDictionary(xmlContent: String): List<SimplifiedEntry> {
@@ -105,7 +135,8 @@ class DictionaryProcessor {
                         kanji = primaryKanji,
                         reading = null,
                         meanings = convertSensesToMeanings(senses),
-                        pitch = null
+                        pitch = null,
+                        jlptLevel = findJlptLevel(primaryKanji, null)
                     )
                 )
                 continue
@@ -125,7 +156,8 @@ class DictionaryProcessor {
                             kanji = primaryKanji,
                             reading = reading,
                             meanings = convertSensesToMeanings(applicableSenses),
-                            pitch = findPitch(entry, reading)
+                            pitch = findPitch(entry, reading),
+                            jlptLevel = findJlptLevel(primaryKanji, reading)
                         )
                     )
                 }
@@ -133,6 +165,17 @@ class DictionaryProcessor {
         }
         
         return simplifiedEntries
+    }
+
+    private fun findJlptLevel(kanji: String?, reading: String?): String? {
+        // Try looking up by kanji first, then reading
+        if (kanji != null && jlptMap.containsKey(kanji)) {
+            return jlptMap[kanji]
+        }
+        if (reading != null && jlptMap.containsKey(reading)) {
+            return jlptMap[reading]
+        }
+        return null
     }
 
     private fun convertSensesToMeanings(senses: List<Sense>): List<MeaningDetail> {
@@ -177,6 +220,10 @@ class DictionaryProcessor {
                 entry.meanings.any { it.gloss.lowercase().contains(lowerQ) }
             }
         }
+    }
+
+    fun getJlptStats(): Map<String, Int> {
+        return mapOf("total" to jlptMap.size)
     }
 }
 
