@@ -65,11 +65,19 @@ export default function SearchPage() {
     const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
     const [showVideo, setShowVideo] = useState(false);
     const [activeTab, setActiveTab] = useState("search");
+    const [selectedJlptLevel, setSelectedJlptLevel] = useState<string | null>(null);
 
     const addCard = useMutation(api.cards.addCard);
     const removeCard = useMutation(api.cards.removeCard);
     const myCards = useQuery(api.cards.getAllCards);
     const { speak } = useTTS();
+
+    // Filter cards by JLPT level
+    const filteredCards = useMemo(() => {
+        if (!myCards) return [];
+        if (!selectedJlptLevel) return myCards;
+        return myCards.filter(card => card.jlptLevel === selectedJlptLevel);
+    }, [myCards, selectedJlptLevel]);
 
     // Sync added state with backend data
     const addedKeys = useMemo(() => {
@@ -246,12 +254,37 @@ export default function SearchPage() {
                 </TabsContent>
 
                 <TabsContent value="myCards" className="mt-0">
+                    {/* JLPT Level Filters */}
+                    <div className="sticky top-0 bg-background/95 backdrop-blur py-4 z-10">
+                        <div className="flex flex-wrap gap-2 justify-center">
+                            <Button
+                                variant={selectedJlptLevel === null ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setSelectedJlptLevel(null)}
+                                className="h-8 px-3"
+                            >
+                                All
+                            </Button>
+                            {['N5', 'N4', 'N3', 'N2', 'N1'].map((level) => (
+                                <Button
+                                    key={level}
+                                    variant={selectedJlptLevel === level ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setSelectedJlptLevel(level)}
+                                    className={`h-8 px-3 ${selectedJlptLevel === level ? '' : getJlptColor(level)}`}
+                                >
+                                    {level}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="mt-4 space-y-4">
                         {myCards === undefined && <div className="text-center text-muted-foreground animate-pulse">...</div>}
 
-                        {myCards && myCards.length === 0 && (
+                        {myCards && filteredCards.length === 0 && (
                             <div className="text-center py-10 text-muted-foreground">
-                                {t.noSavedCards}
+                                {selectedJlptLevel ? `No ${selectedJlptLevel} cards` : t.noSavedCards}
                             </div>
                         )}
 
@@ -262,7 +295,7 @@ export default function SearchPage() {
                             className="space-y-4"
                         >
                             <AnimatePresence mode="popLayout">
-                                {myCards?.map((card) => (
+                                {filteredCards?.map((card) => (
                                     <motion.div
                                         key={card._id}
                                         variants={itemVariants}
