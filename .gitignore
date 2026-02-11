@@ -1,0 +1,33 @@
+# System
+.DS_Store
+
+# Server (Kotlin/Gradle)
+server/.gradle/
+server/.gradle_cache/
+server/.gradle_home*/
+server/.gradle_homeexport/
+server/build/
+server/server/ 
+server/debug.log
+server/tmp*/
+server/*.tar.gz
+server/*.zip
+server/.jdk*/
+fake_home/
+fake_tmp/
+
+# Web (Next.js/Convex)
+web/.next/
+web/node_modules/
+web/.npm_cache/
+web/fake_home/
+web/.env.local
+web/.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Brain Artifacts
+# .gemini/

@@ -1,0 +1,45 @@
+
+# Gradle/Kotlin Build
+.gradle/
+.gradle_cache/
+.gradle_home/
+.gradle_home_clean/
+.gradle_home_recovery/
+.gradle_homeexport/
+build/
+out/
+bin/
+
+# JDK/Java
+.jdk/
+.jdk_recovery/
+*.tar.gz
+
+# Temporary Files
+tmp/
+tmp_build/
+tmp_build_clean/
+tmp_build_recovery/
+tmp_build_safe/
+tmp_gradle/
+tmp_safe/
+tmp_jdk.tar.gz
+
+# IDE
+.idea/
+*.iml
+.settings/
+.classpath
+.project
+.vscode/
+
+# Logs
+*.log
+debug.log
+
+# System
+.DS_Store
+
+# Test/Fake Dirs
+fake_home/
+fake_tmp/
