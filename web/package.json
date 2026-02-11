@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "deploy": "gh-pages -d out"
+    "deploy": "touch out/.nojekyll && gh-pages -d out -t"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

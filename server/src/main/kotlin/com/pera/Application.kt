@@ -18,6 +18,7 @@ fun main() {
 
 fun Application.module() {
     install(CORS) {
+        anyHost()
         allowMethod(HttpMethod.Options)
         allowMethod(HttpMethod.Get)
         allowMethod(HttpMethod.Post)
@@ -26,8 +27,8 @@ fun Application.module() {
         allowMethod(HttpMethod.Patch)
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.AccessControlAllowOrigin)
         allowCredentials = true
-        allowHost("localhost:3100", schemes = listOf("http", "https"))
     }
     install(ContentNegotiation) {
         json(Json {
