@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -27,6 +28,22 @@ interface SearchResult {
     }[];
     pitch?: string;
 }
+
+// Animation variants
+const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1
+        }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+};
 
 export default function SearchPage() {
     const { t } = useLanguage();
@@ -220,39 +237,56 @@ export default function SearchPage() {
                             </div>
                         )}
 
-                        {myCards?.map((card) => (
-                            <Card
-                                key={card._id}
-                                className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer relative group"
-                                onClick={() => handleCardClick(card as any)}
-                            >
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xl font-bold text-primary">
-                                                {card.kanji || card.reading}
-                                            </span>
-                                            {card.kanji && card.reading && (
-                                                <span className="text-xs text-muted-foreground">
-                                                    ({card.reading})
-                                                </span>
-                                            )}
-                                        </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-destructive transition-opacity"
-                                            onClick={(e) => handleRemoveCard(card._id, e)}
+                        <motion.div
+                            variants={containerVariants}
+                            initial="hidden"
+                            animate="show"
+                            className="space-y-4"
+                        >
+                            <AnimatePresence mode="popLayout">
+                                {myCards?.map((card) => (
+                                    <motion.div
+                                        key={card._id}
+                                        variants={itemVariants}
+                                        layout
+                                        initial="hidden"
+                                        animate="show"
+                                        exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                                    >
+                                        <Card
+                                            className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer relative group"
+                                            onClick={() => handleCardClick(card as any)}
                                         >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                        {card.meanings.map(m => m.gloss).join("; ")}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
+                                            <CardContent className="p-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xl font-bold text-primary">
+                                                            {card.kanji || card.reading}
+                                                        </span>
+                                                        {card.kanji && card.reading && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                ({card.reading})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-destructive transition-opacity"
+                                                        onClick={(e) => handleRemoveCard(card._id, e)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                                <div className="text-sm text-muted-foreground">
+                                                    {card.meanings.map(m => m.gloss).join("; ")}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </motion.div>
                     </div>
                 </TabsContent>
             </Tabs>
