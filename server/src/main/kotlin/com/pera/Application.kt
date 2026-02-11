@@ -1,0 +1,74 @@
+package com.pera
+
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import io.ktor.server.plugins.cors.routing.*
+import io.ktor.http.*
+
+fun main() {
+    embeddedServer(Netty, port = 8082, host = "0.0.0.0", module = Application::module)
+        .start(wait = true)
+}
+
+fun Application.module() {
+    install(CORS) {
+        allowMethod(HttpMethod.Options)
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Patch)
+        allowHeader(HttpHeaders.Authorization)
+        allowHeader(HttpHeaders.ContentType)
+        allowCredentials = true
+        allowHost("localhost:3100", schemes = listOf("http", "https"))
+    }
+    install(ContentNegotiation) {
+        json(Json {
+            prettyPrint = true
+            isLenient = true
+        })
+    }
+    configureRouting()
+}
+
+
+fun Application.configureRouting() {
+    // Load dictionary once at startup
+    val processor = DictionaryProcessor()
+    val file = java.io.File("src/main/resources/jmdict_dummy.xml")
+    val dictionaryEntries = if (file.exists()) {
+        println("Loading dictionary from ${file.absolutePath}...")
+        processor.parseDictionary(file.readText())
+    } else {
+        println("Dictionary file not found at ${file.absolutePath}")
+        emptyList()
+    }
+
+    routing {
+        get("/") {
+            call.respondText("Hello World!")
+        }
+        get("/health") {
+            call.respond(mapOf("status" to "ok"))
+        }
+        get("/api/dictionary/seed") {
+            call.respond(dictionaryEntries)
+        }
+        get("/api/dictionary/search") {
+            val query = call.request.queryParameters["q"]
+            if (query.isNullOrBlank()) {
+                call.respond(emptyList<SimplifiedEntry>())
+            } else {
+                val results = processor.search(dictionaryEntries, query)
+                call.respond(results)
+            }
+        }
+    }
+}

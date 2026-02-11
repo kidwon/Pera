@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<JMdict>
+    <entry>
+        <ent_seq>1001000</ent_seq>
+        <r_ele>
+            <reb>こんにちは</reb>
+            <misc>0</misc>
+        </r_ele>
+        <sense>
+            <gloss>hello</gloss>
+            <gloss>你好</gloss>
+        </sense>
+    </entry>
+    <entry>
+        <ent_seq>1002000</ent_seq>
+        <k_ele>
+            <keb>有難う</keb>
+        </k_ele>
+        <r_ele>
+            <reb>ありがとう</reb>
+            <misc>2</misc>
+        </r_ele>
+        <sense>
+            <gloss>thank you</gloss>
+            <gloss>谢谢</gloss>
+        </sense>
+    </entry>
+    <entry>
+        <ent_seq>1003000</ent_seq>
+        <k_ele>
+            <keb>猫</keb>
+        </k_ele>
+        <r_ele>
+            <reb>ねこ</reb>
+            <misc>1</misc>
+        </r_ele>
+        <sense>
+            <gloss>cat</gloss>
+            <gloss>猫</gloss>
+        </sense>
+    </entry>
+    <entry>
+        <ent_seq>1004000</ent_seq>
+        <k_ele>
+            <keb>食べる</keb>
+        </k_ele>
+        <r_ele>
+            <reb>たべる</reb>
+            <misc>2</misc>
+        </r_ele>
+        <sense>
+            <gloss>to eat</gloss>
+            <gloss>吃</gloss>
+            <example>
+                <ex_text>I eat sushi.</ex_text>
+                <ex_text_ja>私は寿司を食べる。</ex_text_ja>
+            </example>
+        </sense>
+        <sense>
+            <gloss>to live on (e.g. a salary)</gloss>
+            <gloss>靠...生活</gloss>
+        </sense>
+    </entry>
+    <entry>
+        <ent_seq>1005000</ent_seq>
+        <k_ele>
+            <keb>見る</keb>
+        </k_ele>
+        <r_ele>
+            <reb>みる</reb>
+            <misc>1</misc>
+        </r_ele>
+        <sense>
+            <gloss>to see</gloss>
+            <gloss>to look</gloss>
+            <gloss>to watch</gloss>
+            <gloss>看</gloss>
+            <gloss>看见</gloss>
+            <example>
+                <ex_text>I saw a movie.</ex_text>
+                <ex_text_ja>映画を見た。</ex_text_ja>
+            </example>
+        </sense>
+    </entry>
+    <entry>
+        <ent_seq>1006000</ent_seq>
+        <k_ele>
+            <keb>行く</keb>
+        </k_ele>
+        <r_ele>
+            <reb>いく</reb>
+            <misc>0</misc>
+        </r_ele>
+        <sense>
+            <gloss>to go</gloss>
+            <gloss>to move (in a direction or towards a specific location)</gloss>
+            <gloss>去</gloss>
+            <example>
+                <ex_text>I go to school.</ex_text>
+                <ex_text_ja>学校へ行く。</ex_text_ja>
+            </example>
+        </sense>
+        <sense>
+            <gloss>to proceed</gloss>
+            <gloss>to take place</gloss>
+            <gloss>进行</gloss>
+        </sense>
+    </entry>
+    <entry>
+        <ent_seq>2001000</ent_seq>
+        <k_ele>
+            <keb>行</keb>
+        </k_ele>
+        <r_ele>
+            <reb>ぎょう</reb>
+        </r_ele>
+        <r_ele>
+            <reb>こう</reb>
+        </r_ele>
+        <sense>
+            <stagr>ぎょう</stagr>
+            <gloss>line (of text)</gloss>
+            <gloss>row</gloss>
+        </sense>
+        <sense>
+            <stagr>こう</stagr>
+            <gloss>act</gloss>
+            <gloss>deed</gloss>
+            <gloss>conduct</gloss>
+        </sense>
+    </entry>
+</JMdict>

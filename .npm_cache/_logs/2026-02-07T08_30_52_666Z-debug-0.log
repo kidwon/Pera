@@ -1,0 +1,41 @@
+0 verbose cli /Users/kid/.nvm/versions/node/v22.17.1/bin/node /Users/kid/.nvm/versions/node/v22.17.1/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@11.4.2
+2 info using node@v22.17.1
+3 silly config load:file:/Users/kid/.nvm/versions/node/v22.17.1/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/kid/priv/Pera/.npmrc
+5 silly config load:file:/Users/kid/.npmrc
+6 silly config load:file:/Users/kid/.nvm/versions/node/v22.17.1/etc/npmrc
+7 verbose title npm exec create-next-app@latest web --typescript --tailwind --eslint --app --src-dir --import-alias @/* --use-npm --no-git
+8 verbose argv "exec" "--" "create-next-app@latest" "web" "--typescript" "--tailwind" "--eslint" "--app" "--src-dir" "--import-alias" "@/*" "--use-npm" "--no-git"
+9 verbose logfile logs-max:10 dir:/Users/kid/priv/Pera/.npm_cache/_logs/2026-02-07T08_30_52_666Z-
+10 verbose logfile /Users/kid/priv/Pera/.npm_cache/_logs/2026-02-07T08_30_52_666Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 http fetch GET 200 https://registry.npmjs.org/npm 284ms
+14 http fetch GET 200 https://registry.npmjs.org/create-next-app 557ms (cache miss)
+15 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+16 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+17 silly idealTree buildDeps
+18 silly fetch manifest create-next-app@16.1.6
+19 silly packumentCache full:https://registry.npmjs.org/create-next-app cache-miss
+20 http fetch GET 200 https://registry.npmjs.org/create-next-app 483ms (cache miss)
+21 silly packumentCache full:https://registry.npmjs.org/create-next-app set size:undefined disposed:false
+22 silly placeDep ROOT create-next-app@16.1.6 OK for:  want: 16.1.6
+23 silly reify moves {}
+24 silly audit bulk request { 'create-next-app': [ '16.1.6' ] }
+25 http cache create-next-app@https://registry.npmjs.org/create-next-app/-/create-next-app-16.1.6.tgz 0ms (cache hit)
+26 silly tarball no local data for create-next-app@https://registry.npmjs.org/create-next-app/-/create-next-app-16.1.6.tgz. Extracting by manifest.
+27 http fetch GET 200 https://registry.npmjs.org/create-next-app/-/create-next-app-16.1.6.tgz 66ms (cache miss)
+28 http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 136ms
+29 silly audit report {}
+30 verbose cwd /Users/kid/priv/Pera
+31 verbose os Darwin 24.6.0
+32 verbose node v22.17.1
+33 verbose npm  v11.4.2
+34 notice
+34 notice New minor version of npm available! 11.4.2 -> 11.9.0
+34 notice Changelog: https://github.com/npm/cli/releases/tag/v11.9.0
+34 notice To update run: npm install -g npm@11.9.0
+34 notice  { force: true, [Symbol(proc-log.meta)]: true }
+35 verbose exit 0
+36 info ok

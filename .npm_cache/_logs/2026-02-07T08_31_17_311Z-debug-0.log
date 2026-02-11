@@ -1,0 +1,22 @@
+0 verbose cli /Users/kid/.nvm/versions/node/v22.17.1/bin/node /Users/kid/.nvm/versions/node/v22.17.1/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@11.4.2
+2 info using node@v22.17.1
+3 silly config load:file:/Users/kid/.nvm/versions/node/v22.17.1/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/kid/priv/Pera/.npmrc
+5 silly config load:file:/Users/kid/.npmrc
+6 silly config load:file:/Users/kid/.nvm/versions/node/v22.17.1/etc/npmrc
+7 verbose title npm exec create-next-app@latest web --typescript --tailwind --eslint --app --src-dir --import-alias @/* --use-npm --no-git
+8 verbose argv "exec" "--" "create-next-app@latest" "web" "--typescript" "--tailwind" "--eslint" "--app" "--src-dir" "--import-alias" "@/*" "--use-npm" "--no-git"
+9 verbose logfile logs-max:10 dir:/Users/kid/priv/Pera/.npm_cache/_logs/2026-02-07T08_31_17_311Z-
+10 verbose logfile /Users/kid/priv/Pera/.npm_cache/_logs/2026-02-07T08_31_17_311Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 http fetch GET 200 https://registry.npmjs.org/create-next-app 120ms (cache revalidated)
+14 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+15 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+16 verbose cwd /Users/kid/priv/Pera
+17 verbose os Darwin 24.6.0
+18 verbose node v22.17.1
+19 verbose npm  v11.4.2
+20 verbose exit 0
+21 info ok
