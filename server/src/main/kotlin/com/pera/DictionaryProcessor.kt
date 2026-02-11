@@ -161,11 +161,13 @@ class DictionaryProcessor {
         val isAscii = q.all { it.code < 128 }
         
         return if (isAscii) {
+            val romajiKana = RomajiToKana.convert(q)
             val regex = Regex("\\b${Regex.escape(q)}\\b", RegexOption.IGNORE_CASE)
             entries.filter { entry ->
                 entry.kanji?.contains(q, ignoreCase = true) == true ||
                 entry.reading?.contains(q, ignoreCase = true) == true ||
-                entry.meanings.any { it.gloss.contains(regex) } // Check description only for now
+                (romajiKana != null && entry.reading?.contains(romajiKana) == true) ||
+                entry.meanings.any { it.gloss.contains(regex) }
             }
         } else {
             val lowerQ = q.lowercase()
@@ -175,5 +177,73 @@ class DictionaryProcessor {
                 entry.meanings.any { it.gloss.lowercase().contains(lowerQ) }
             }
         }
+    }
+}
+
+object RomajiToKana {
+    private val mapping = mapOf(
+        "a" to "あ", "i" to "い", "u" to "う", "e" to "え", "o" to "お",
+        "ka" to "か", "ki" to "き", "ku" to "く", "ke" to "け", "ko" to "こ",
+        "sa" to "さ", "shi" to "し", "su" to "す", "se" to "せ", "so" to "そ",
+        "ta" to "た", "chi" to "ち", "tsu" to "つ", "te" to "て", "to" to "と",
+        "na" to "な", "ni" to "に", "nu" to "ぬ", "ne" to "ね", "no" to "の",
+        "ha" to "は", "hi" to "ひ", "fu" to "ふ", "he" to "へ", "ho" to "ほ",
+        "ma" to "ま", "mi" to "み", "mu" to "む", "me" to "め", "mo" to "も",
+        "ya" to "や", "yu" to "ゆ", "yo" to "よ",
+        "ra" to "ら", "ri" to "り", "ru" to "る", "re" to "れ", "ro" to "ろ",
+        "wa" to "わ", "wo" to "を", "n" to "ん",
+        "ga" to "が", "gi" to "ぎ", "gu" to "ぐ", "ge" to "げ", "go" to "ご",
+        "za" to "ざ", "ji" to "じ", "zu" to "ず", "ze" to "ぜ", "zo" to "ぞ",
+        "da" to "だ", "di" to "ぢ", "du" to "づ", "de" to "で", "do" to "ど",
+        "ba" to "ば", "bi" to "び", "bu" to "ぶ", "be" to "べ", "bo" to "ぼ",
+        "pa" to "ぱ", "pi" to "ぴ", "pu" to "ぷ", "pe" to "ぺ", "po" to "ぽ",
+        "kya" to "きゃ", "kyu" to "きゅ", "kyo" to "きょ",
+        "sha" to "しゃ", "shu" to "しゅ", "sho" to "しょ",
+        "cha" to "ちゃ", "chu" to "ちゅ", "cho" to "ちょ",
+        "nya" to "にゃ", "nyu" to "にゅ", "nyo" to "にょ",
+        "hya" to "ひゃ", "hyu" to "ひゅ", "hyo" to "ひょ",
+        "mya" to "みゃ", "myu" to "みゅ", "myo" to "みょ",
+        "rya" to "りゃ", "ryu" to "りゅ", "ryo" to "りょ",
+        "gya" to "ぎゃ", "gyu" to "ぎゅ", "gyo" to "ぎょ",
+        "ja" to "じゃ", "ju" to "じゅ", "jo" to "じょ",
+        "bya" to "びゃ", "byu" to "びゅ", "byo" to "びょ",
+        "pya" to "ぴゃ", "pyu" to "ぴゅ", "pyo" to "ぴょ"
+    )
+
+    fun convert(input: String): String? {
+        val result = StringBuilder()
+        var i = 0
+        val lower = input.lowercase()
+        while (i < lower.length) {
+            var found = false
+            // Try 3 chars, then 2, then 1
+            for (len in 3 downTo 1) {
+                if (i + len <= lower.length) {
+                    val part = lower.substring(i, i + len)
+                    val kana = mapping[part]
+                    if (kana != null) {
+                        result.append(kana)
+                        i += len
+                        found = true
+                        break
+                    }
+                }
+            }
+            if (!found) {
+                // Check for double consonants (small tsu)
+                if (i + 1 < lower.length && lower[i] == lower[i + 1] && lower[i] in 'a'..'z' && lower[i] !in "aeiou") {
+                    result.append("っ")
+                    i += 1
+                    found = true
+                }
+            }
+            if (!found) {
+                // If not found and not a special case, it's not a valid romaji string we can convert fully
+                // but we might want to just keep it as is or return null. 
+                // For search, returning null if it contains non-romaji chars is safer.
+                return null 
+            }
+        }
+        return result.toString()
     }
 }
