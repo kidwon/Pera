@@ -5,12 +5,14 @@ import { YouGlishPlayer } from "./YouGlishPlayer";
 import { Button } from "./ui/button";
 import { PlayCircle } from "lucide-react";
 import { useState } from "react";
+import { useLanguage } from "@/app/LanguageProvider";
 
 interface VideoDrawerProps {
     query: string;
 }
 
 export function VideoDrawer({ query }: VideoDrawerProps) {
+    const { t } = useLanguage();
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -18,7 +20,7 @@ export function VideoDrawer({ query }: VideoDrawerProps) {
             <Drawer.Trigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">
                     <PlayCircle className="h-4 w-4" />
-                    Watch Examples
+                    {t.examplesVideo}
                 </Button>
             </Drawer.Trigger>
             <Drawer.Portal>
@@ -28,7 +30,7 @@ export function VideoDrawer({ query }: VideoDrawerProps) {
                         <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted mb-8" />
                         <div className="flex flex-col items-center">
                             <Drawer.Title className="font-medium mb-4">
-                                Example Videos for "{query}"
+                                {t.examples}: "{query}"
                             </Drawer.Title>
                             {isOpen && (
                                 <YouGlishPlayer query={query} />

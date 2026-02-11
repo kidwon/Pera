@@ -5,15 +5,17 @@ import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/app/LanguageProvider";
 
 export default function SeedPage() {
+    const { t } = useLanguage();
     const seed = useMutation(api.cards.seed);
     const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
     const [message, setMessage] = useState("");
 
     const handleSeed = async () => {
         setStatus("loading");
-        setMessage("Fetching dictionary from server...");
+        setMessage("...");
 
         try {
             // 1. Fetch from Ktor
@@ -24,17 +26,17 @@ export default function SeedPage() {
             }
             const entries = await response.json();
 
-            setMessage(`Fetched ${entries.length} entries. Seeding Convex...`);
+            setMessage(`Fetched ${entries.length}.`);
 
             // 2. Call Convex Mutation
             const count = await seed({ cards: entries });
 
             setStatus("success");
-            setMessage(`Successfully seeded ${count} new cards!`);
+            setMessage(t.seedSuccess);
         } catch (err) {
             console.error(err);
             setStatus("error");
-            setMessage(err instanceof Error ? err.message : "Undefined error");
+            setMessage(err instanceof Error ? err.message : "Error");
         }
     };
     const deleteAll = useMutation(api.cards.deleteAllCards);
@@ -43,18 +45,18 @@ export default function SeedPage() {
         <div className="container mx-auto p-10 flex justify-center">
             <Card className="w-[400px]">
                 <CardHeader>
-                    <CardTitle>Dictionary Seeding</CardTitle>
+                    <CardTitle>{t.seedDatabase}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
-                    <p className="text-sm text-gray-500">
-                        Fetches dictionary data from the local Ktor server (port 8081) and seeds it into the Convex database.
+                    <p className="text-sm text-muted-foreground">
+                        {t.appName}: Initializing dictionary data...
                     </p>
 
-                    <div className="bg-slate-100 p-4 rounded-md min-h-[60px] text-sm">
-                        {status === "idle" && "Ready to seed."}
-                        {status === "loading" && <span className="text-blue-500">{message}</span>}
+                    <div className="bg-muted p-4 rounded-md min-h-[60px] text-sm">
+                        {status === "idle" && "Ready."}
+                        {status === "loading" && <span className="text-primary">{message || t.seeding}</span>}
                         {status === "success" && <span className="text-green-500">{message}</span>}
-                        {status === "error" && <span className="text-red-500">Error: {message}</span>}
+                        {status === "error" && <span className="text-destructive">Error: {message}</span>}
                     </div>
 
                     <Button
@@ -62,7 +64,7 @@ export default function SeedPage() {
                         disabled={status === "loading"}
                         className="w-full"
                     >
-                        {status === "loading" ? "Seeding..." : "Start Seeding"}
+                        {status === "loading" ? t.seeding : t.seedDatabase}
                     </Button>
 
                     <Button

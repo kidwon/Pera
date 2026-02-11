@@ -10,6 +10,8 @@ import { Plus, Check, Volume2 } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { SimpleDialog } from "@/components/ui/simple-dialog";
 import { YouGlishPlayer } from "@/components/YouGlishPlayer";
+import { useLanguage } from "@/app/LanguageProvider";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface SearchResult {
     ent_seq: string;
@@ -26,6 +28,7 @@ interface SearchResult {
 }
 
 export default function SearchPage() {
+    const { t } = useLanguage();
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
@@ -124,11 +127,14 @@ export default function SearchPage() {
 
     return (
         <div className="container mx-auto max-w-2xl p-4 min-h-screen pb-20">
-            <h1 className="text-3xl font-bold mb-6 text-center">ペラペラ</h1>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-center flex-1 ml-10">{t.appName}</h1>
+                <LanguageSwitcher />
+            </div>
 
             <div className="sticky top-0 bg-background/95 backdrop-blur py-4 z-10">
                 <Input
-                    placeholder="Search word/meaning (e.g. ねこ, cat)..."
+                    placeholder={t.searchPlaceholder}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="text-lg h-12"
@@ -137,10 +143,10 @@ export default function SearchPage() {
             </div>
 
             <div className="mt-4 space-y-4">
-                {loading && <div className="text-center text-muted-foreground animate-pulse">Searching...</div>}
+                {loading && <div className="text-center text-muted-foreground animate-pulse">...</div>}
 
                 {!loading && results.length === 0 && query.trim() !== "" && (
-                    <div className="text-center text-muted-foreground">No results found.</div>
+                    <div className="text-center text-muted-foreground">{t.noCards}</div>
                 )}
 
                 {results.map((result) => (
@@ -178,7 +184,7 @@ export default function SearchPage() {
                 <SimpleDialog
                     isOpen={!!selectedResult}
                     onClose={closeDetail}
-                    title="Card Details"
+                    title={selectedResult.kanji || selectedResult.reading || ""}
                 >
                     <div className="space-y-6">
                         {/* Header Section */}
@@ -211,7 +217,7 @@ export default function SearchPage() {
                                 return (
                                     <div key={index} className="p-3 rounded-md bg-muted/30 border">
                                         <div className="flex items-start justify-between mb-2">
-                                            <span className="font-medium text-lg">
+                                            <span className="font-medium text-lg text-primary/90">
                                                 {index + 1}. {meaning.gloss}
                                             </span>
                                             <Button
@@ -225,7 +231,7 @@ export default function SearchPage() {
                                                 className="gap-1 h-8"
                                             >
                                                 {isAdded ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                                                {isAdded ? "Added" : "Add"}
+                                                {isAdded ? t.added : t.addCard}
                                             </Button>
                                         </div>
 
@@ -233,8 +239,8 @@ export default function SearchPage() {
                                             <div className="mt-2 text-sm text-muted-foreground/90 pl-3 border-l-2 border-primary/20 space-y-2">
                                                 {meaning.examples.map((ex, i) => (
                                                     <div key={i}>
-                                                        <div className="italic">{ex.text}</div>
-                                                        <div className="opacity-75 text-xs">{ex.text_ja}</div>
+                                                        <div className="italic text-foreground/90">{ex.text}</div>
+                                                        <div className="opacity-75 text-xs font-medium">{ex.text_ja}</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -247,11 +253,11 @@ export default function SearchPage() {
                         {/* Actions Footer */}
                         <div className="pt-4 border-t flex flex-col gap-3">
                             <Button
-                                variant={showVideo ? "secondary" : "default"}
+                                variant={showVideo ? "secondary" : "outline"}
                                 className="w-full gap-2"
                                 onClick={() => setShowVideo(!showVideo)}
                             >
-                                {showVideo ? "Hide Video Examples" : "Watch Real-world Examples"}
+                                {t.examplesVideo}
                             </Button>
 
                             {showVideo && (

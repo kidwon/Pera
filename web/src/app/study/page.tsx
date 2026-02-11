@@ -8,8 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Volume2 } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { VideoDrawer } from "@/components/VideoDrawer";
+import { useLanguage } from "@/app/LanguageProvider";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export default function StudyPage() {
+    const { t } = useLanguage();
     const dueCards = useQuery(api.cards.getDueCards, { limit: 10 });
     const reviewCard = useMutation(api.srs.review);
     const { speak } = useTTS();
@@ -40,14 +43,14 @@ export default function StudyPage() {
     };
 
     if (!dueCards) {
-        return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+        return <div className="flex items-center justify-center min-h-screen">...</div>;
     }
 
     if (cards.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen p-4">
-                <h1 className="text-2xl font-bold mb-4">All done for now!</h1>
-                <Button onClick={() => window.location.reload()}>Refresh</Button>
+                <h1 className="text-2xl font-bold mb-4">{t.noCards}</h1>
+                <Button onClick={() => window.location.href = "/Pera/search"}>{t.backToSearch}</Button>
             </div>
         );
     }
@@ -56,8 +59,11 @@ export default function StudyPage() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-muted/20 overflow-hidden relative">
+            <div className="absolute top-4 left-4">
+                <LanguageSwitcher />
+            </div>
             <div className="absolute top-4 right-4 text-sm text-muted-foreground">
-                {cards.length} cards remaining
+                {cards.length} {t.appName}
             </div>
 
             <Flashcard
@@ -124,7 +130,7 @@ export default function StudyPage() {
 
             {/* Helper text */}
             < div className="mt-12 text-sm text-muted-foreground animate-pulse" >
-                Swipe Right & rarr; Good | Swipe Left & rarr; Again
+                {t.appName}: {t.easy} (&rarr;) | {t.again} (&larr;)
             </div >
         </div >
     );
