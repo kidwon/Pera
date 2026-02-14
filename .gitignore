@@ -32,3 +32,9 @@ web/.env
 
 # Brain Artifacts
 # .gemini/
+
+# Large Dictionary Files
+**/src/main/resources/*.xml
+**/src/main/resources/*.json
+!**/src/main/resources/jlpt_vocab.json
+!**/src/main/resources/dictionary_snapshot.json.gz

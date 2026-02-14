@@ -10,6 +10,8 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.http.*
+import java.util.zip.GZIPInputStream
+import kotlinx.serialization.json.decodeFromStream
 
 fun main() {
     embeddedServer(Netty, port = 8082, host = "0.0.0.0", module = Application::module)
@@ -52,21 +54,44 @@ fun Application.module() {
 
 
 fun Application.configureRouting() {
-    // Load dictionary once at startup
-    // Load dictionary once at startup
     val processor = DictionaryProcessor()
-    // Use classpath resource loading
+    
+    // Load pre-generated JSON snapshot (GZIP compressed) for fast startup
     val dictionaryEntries = try {
-        val resource = Application::class.java.getResource("/jmdict_dummy.xml")
+        val resource = Application::class.java.getResource("/dictionary_snapshot.json.gz")
         if (resource != null) {
-            println("Loading dictionary from ${resource.path}...")
-            processor.parseDictionary(resource.readText())
+            println("Loading compressed dictionary snapshot...")
+            val startTime = System.currentTimeMillis()
+            
+            val entries = resource.openStream().use { inputStream ->
+                GZIPInputStream(inputStream).use { gzis ->
+                    val json = Json { ignoreUnknownKeys = true }
+                    json.decodeFromStream<List<SimplifiedEntry>>(gzis)
+                }
+            }
+            
+            val loadTime = System.currentTimeMillis() - startTime
+            println("✅ Loaded ${entries.size} entries in ${loadTime}ms")
+            
+            // Print JLPT statistics
+            val jlptStats = entries.groupingBy { it.jlptLevel ?: "No Level" }.eachCount()
+            println("📊 JLPT Distribution:")
+            jlptStats.toSortedMap().forEach { (level, count) ->
+                println("  $level: $count")
+            }
+            
+            entries
         } else {
-            println("Dictionary file not found in classpath")
-            emptyList()
+            println("⚠️ Dictionary snapshot not found, using dummy data")
+            val xmlResource = Application::class.java.getResource("/jmdict_dummy.xml")
+            if (xmlResource != null) {
+                processor.parseDictionary(xmlResource.readText())
+            } else {
+                emptyList()
+            }
         }
     } catch (e: Exception) {
-        println("Error loading dictionary: ${e.message}")
+        println("❌ Error loading dictionary: ${e.message}")
         e.printStackTrace()
         emptyList()
     }
@@ -85,8 +110,19 @@ fun Application.configureRouting() {
             call.respond(processor.getJlptStats())
         }
         get("/api/dictionary/search") {
-            val query = call.request.queryParameters["q"]
-            if (query.isNullOrBlank()) {
+            val rawQuery = call.request.queryParameters["q"] ?: ""
+            // Fix potential encoding issues where UTF-8 bytes are interpreted as ISO-8859-1
+            val query = if (rawQuery.any { it.code in 0x80..0xFF }) {
+                try {
+                    String(rawQuery.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+                } catch (e: Exception) {
+                    rawQuery
+                }
+            } else {
+                rawQuery
+            }
+            
+            if (query.isBlank()) {
                 call.respond(emptyList<SimplifiedEntry>())
             } else {
                 val results = processor.search(dictionaryEntries, query)

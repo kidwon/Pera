@@ -81,6 +81,13 @@ data class ExamplePair(
 class DictionaryProcessor {
     private val xmlMapper = XmlMapper().apply {
         registerKotlinModule()
+        // Configure to handle external entities in JMdict
+        factory.xmlInputFactory.apply {
+            setProperty("javax.xml.stream.isSupportingExternalEntities", true)
+            setProperty("javax.xml.stream.supportDTD", true)
+            // JMdict has extensive entity usage, need to increase limit
+            setProperty("com.ctc.wstx.maxEntityCount", Integer.MAX_VALUE)
+        }
     }
     
     // Map: Kanji/Word -> Level (e.g. "猫" -> "N5")
@@ -126,21 +133,8 @@ class DictionaryProcessor {
             // Primary Kanji (for display if available, otherwise null)
             val primaryKanji = kanjiList.firstOrNull()
             
-            // If no readings, skip (shouldn't happen in valid JMdict)
-            if (readingList.isEmpty()) {
-                // Fallback: create one entry if only kanji exists (rare)
-                simplifiedEntries.add(
-                    SimplifiedEntry(
-                        ent_seq = entry.ent_seq,
-                        kanji = primaryKanji,
-                        reading = null,
-                        meanings = convertSensesToMeanings(senses),
-                        pitch = null,
-                        jlptLevel = findJlptLevel(primaryKanji, null)
-                    )
-                )
-                continue
-            }
+            // If no readings, skip
+            if (readingList.isEmpty()) continue
 
             // Explode by Reading
             for (reading in readingList) {
@@ -149,13 +143,17 @@ class DictionaryProcessor {
                     sense.stagr == null || sense.stagr.isEmpty() || sense.stagr.contains(reading)
                 }
 
-                if (applicableSenses.isNotEmpty()) {
+                // If no senses are specific to this reading AND there are general senses, 
+                // the dictionary structure implies we should use all senses.
+                val finalSenses = if (applicableSenses.isEmpty()) senses else applicableSenses
+
+                if (finalSenses.isNotEmpty()) {
                     simplifiedEntries.add(
                         SimplifiedEntry(
-                            ent_seq = "${entry.ent_seq}_$reading", // Unique ID for split entry
+                            ent_seq = "${entry.ent_seq}_$reading",
                             kanji = primaryKanji,
                             reading = reading,
-                            meanings = convertSensesToMeanings(applicableSenses),
+                            meanings = convertSensesToMeanings(finalSenses),
                             pitch = findPitch(entry, reading),
                             jlptLevel = findJlptLevel(primaryKanji, reading)
                         )
@@ -199,27 +197,80 @@ class DictionaryProcessor {
 
     fun search(entries: List<SimplifiedEntry>, query: String): List<SimplifiedEntry> {
         if (query.isBlank()) return emptyList()
-        val q = query.trim()
-        
+        val q = query.trim().lowercase()
         val isAscii = q.all { it.code < 128 }
-        
-        return if (isAscii) {
-            val romajiKana = RomajiToKana.convert(q)
-            val regex = Regex("\\b${Regex.escape(q)}\\b", RegexOption.IGNORE_CASE)
-            entries.filter { entry ->
-                entry.kanji?.contains(q, ignoreCase = true) == true ||
-                entry.reading?.contains(q, ignoreCase = true) == true ||
-                (romajiKana != null && entry.reading?.contains(romajiKana) == true) ||
-                entry.meanings.any { it.gloss.contains(regex) }
-            }
-        } else {
-            val lowerQ = q.lowercase()
-            entries.filter { entry ->
-                entry.kanji?.contains(lowerQ) == true ||
-                entry.reading?.contains(lowerQ) == true ||
-                entry.meanings.any { it.gloss.lowercase().contains(lowerQ) }
-            }
+        val romajiKana = if (isAscii) RomajiToKana.convert(q) else null
+
+        return entries.mapNotNull { entry ->
+            val score = calculateScore(entry, q, romajiKana)
+            if (score > 0) entry to score else null
         }
+        .sortedByDescending { it.second }
+        .map { it.first }
+        .take(50)
+    }
+
+    private fun calculateScore(entry: SimplifiedEntry, query: String, romajiKana: String?): Int {
+        var totalScore = 0
+
+        // 1. Check Kanji & Reading (High Weight: x10)
+        val wordMultiplier = 10
+        val kanji = entry.kanji?.lowercase()
+        val reading = entry.reading?.lowercase()
+
+        totalScore += maxOf(
+            getMatchScore(kanji, query) * wordMultiplier,
+            getMatchScore(reading, query) * wordMultiplier,
+            if (romajiKana != null) getMatchScore(reading, romajiKana) * wordMultiplier else 0
+        )
+
+        // 2. Check Meanings (Normal Weight: x1)
+        var maxMeaningScore = 0
+        for (meaning in entry.meanings) {
+            val gloss = meaning.gloss.lowercase()
+            maxMeaningScore = maxOf(maxMeaningScore, getMatchScore(gloss, query))
+        }
+        totalScore += maxMeaningScore
+
+        // If no match across any fields, return 0
+        if (totalScore == 0) return 0
+
+        // 3. JLPT Bonus
+        totalScore += when (entry.jlptLevel?.uppercase()) {
+            "N5" -> 100
+            "N4" -> 80
+            "N3" -> 60
+            "N2" -> 40
+            "N1" -> 20
+            else -> 0
+        }
+
+        return totalScore
+    }
+
+    private fun getMatchScore(target: String?, query: String): Int {
+        if (target == null || target.isEmpty()) return 0
+        
+        // Exact match
+        if (target == query) return 500
+        
+        // Special case for Japanese: if exact match is needed for characters
+        // But \b might fail for non-ascii. Let's use it only if query is ASCII
+        val isQueryAscii = query.all { it.code < 128 }
+        
+        if (isQueryAscii) {
+            // Word boundary match (e.g., searching "cat" matches "cat burglar" as a word)
+            val wordBoundaryRegex = Regex("\\b${Regex.escape(query)}\\b")
+            if (wordBoundaryRegex.containsMatchIn(target)) return 200
+        }
+
+        // Prefix match
+        if (target.startsWith(query)) return 100
+
+        // Contain match
+        if (target.contains(query)) return 20
+
+        return 0
     }
 
     fun getJlptStats(): Map<String, Int> {

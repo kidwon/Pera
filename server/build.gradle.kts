@@ -41,3 +41,12 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
+
+// Task to build dictionary snapshot
+tasks.register<JavaExec>("buildDictionary") {
+    group = "application"
+    description = "Generate dictionary JSON snapshot from JMdict XML"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.pera.DictionaryBuilderKt")
+    jvmArgs = listOf("-Xmx2g") // Increase heap for large XML parsing and serialization
+}
