@@ -21,6 +21,7 @@ interface SearchResult {
     reading: string | null;
     meanings: {
         gloss: string;
+        gloss_cn?: string | null;
         examples?: {
             text: string;
             text_ja: string;
@@ -244,7 +245,13 @@ export default function SearchPage() {
                                             </div>
                                         </div>
                                         <div className="text-sm text-muted-foreground line-clamp-2">
-                                            {result.meanings.map(m => m.gloss).join("; ")}
+                                            {result.meanings.map((m, i) => (
+                                                <span key={i}>
+                                                    {m.gloss_cn ? <span className="text-primary/80 font-medium">[{m.gloss_cn}] </span> : null}
+                                                    {m.gloss}
+                                                    {i < result.meanings.length - 1 ? "; " : ""}
+                                                </span>
+                                            ))}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -337,7 +344,14 @@ export default function SearchPage() {
                                                     </Button>
                                                 </div>
                                                 <div className="text-sm text-muted-foreground">
-                                                    {card.meanings.map(m => m.gloss).join("; ")}
+                                                    {card.meanings.map((m, i) => (
+                                                        <span key={i}>
+                                                            {/* @ts-ignore */}
+                                                            {m.gloss_cn ? <span className="text-primary/80 font-medium">[{m.gloss_cn}] </span> : null}
+                                                            {m.gloss}
+                                                            {i < card.meanings.length - 1 ? "; " : ""}
+                                                        </span>
+                                                    ))}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -392,9 +406,16 @@ export default function SearchPage() {
                                 return (
                                     <div key={index} className="p-3 rounded-md bg-muted/30 border">
                                         <div className="flex items-start justify-between mb-2">
-                                            <span className="font-medium text-lg text-primary/90">
-                                                {index + 1}. {meaning.gloss}
-                                            </span>
+                                            <div className="space-y-1">
+                                                {meaning.gloss_cn && (
+                                                    <div className="text-xl font-bold text-primary">
+                                                        {meaning.gloss_cn}
+                                                    </div>
+                                                )}
+                                                <div className="text-muted-foreground">
+                                                    {index + 1}. {meaning.gloss}
+                                                </div>
+                                            </div>
                                             <Button
                                                 size="sm"
                                                 variant={isAdded ? "secondary" : "outline"}

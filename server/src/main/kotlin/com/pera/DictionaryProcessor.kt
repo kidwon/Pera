@@ -69,6 +69,7 @@ data class SimplifiedEntry(
 @Serializable
 data class MeaningDetail(
     val gloss: String,
+    val gloss_cn: String? = null, // Chinese definition
     val examples: List<ExamplePair> = emptyList()
 )
 
@@ -92,9 +93,32 @@ class DictionaryProcessor {
     
     // Map: Kanji/Word -> Level (e.g. "猫" -> "N5")
     private var jlptMap: Map<String, String> = emptyMap()
+    
+    // Map: Word -> Chinese Gloss
+    private var chineseThesaurus: Map<String, String> = emptyMap()
 
     init {
         loadJlptData()
+        loadChineseThesaurus()
+    }
+
+    private fun loadChineseThesaurus() {
+        try {
+            val resource = DictionaryProcessor::class.java.getResource("/jp_zh_thesaurus.json")
+            if (resource != null) {
+                val jsonContent = resource.readText()
+                val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                chineseThesaurus = mapper.readValue(
+                        jsonContent,
+                        object : com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                )
+                println("✅ Loaded ${chineseThesaurus.size} Chinese thesaurus entries")
+            } else {
+                println("⚠️ Chinese thesaurus file not found: /jp_zh_thesaurus.json")
+            }
+        } catch (e: Exception) {
+            println("⚠️ Could not load Chinese thesaurus: ${e.message}")
+        }
     }
 
     private fun loadJlptData() {
@@ -148,12 +172,16 @@ class DictionaryProcessor {
                 val finalSenses = if (applicableSenses.isEmpty()) senses else applicableSenses
 
                 if (finalSenses.isNotEmpty()) {
+                    // 5. Look up Chinese gloss
+                    val chineseGloss = findChineseGloss(primaryKanji, reading)
+                    val meanings = convertSensesToMeanings(finalSenses, chineseGloss)
+
                     simplifiedEntries.add(
                         SimplifiedEntry(
                             ent_seq = "${entry.ent_seq}_$reading",
                             kanji = primaryKanji,
                             reading = reading,
-                            meanings = convertSensesToMeanings(finalSenses),
+                            meanings = meanings,
                             pitch = findPitch(entry, reading),
                             jlptLevel = findJlptLevel(primaryKanji, reading)
                         )
@@ -176,13 +204,26 @@ class DictionaryProcessor {
         return null
     }
 
-    private fun convertSensesToMeanings(senses: List<Sense>): List<MeaningDetail> {
-        return senses.map { sense ->
+    private fun findChineseGloss(kanji: String?, reading: String?): String? {
+        if (kanji != null && chineseThesaurus.containsKey(kanji)) {
+            return chineseThesaurus[kanji]
+        }
+        if (reading != null && chineseThesaurus.containsKey(reading)) {
+            return chineseThesaurus[reading]
+        }
+        return null
+    }
+
+    private fun convertSensesToMeanings(senses: List<Sense>, chineseGloss: String?): List<MeaningDetail> {
+        return senses.mapIndexed { index, sense ->
             val glossText = sense.gloss?.joinToString("; ") ?: ""
             val examples = sense.example?.map { ex ->
                 ExamplePair(text = ex.ex_text, text_ja = ex.ex_text_ja)
             } ?: emptyList()
-            MeaningDetail(gloss = glossText, examples = examples)
+            
+            // Only attach Chinese gloss to the first sense (primary meaning)
+            val cn = if (index == 0) chineseGloss else null
+            MeaningDetail(gloss = glossText, gloss_cn = cn, examples = examples)
         }
     }
 
@@ -200,10 +241,19 @@ class DictionaryProcessor {
         val q = query.trim().lowercase()
         val isAscii = q.all { it.code < 128 }
         val romajiKana = if (isAscii) RomajiToKana.convert(q) else null
+        
+        // Character normalization for Chinese/Japanese variants
+        val normalizedQ = if (!isAscii) KanjiNormalizer.normalize(q) else null
 
         return entries.mapNotNull { entry ->
+            // Try scoring with original query and normalized query
             val score = calculateScore(entry, q, romajiKana)
-            if (score > 0) entry to score else null
+            val normalizedScore = if (normalizedQ != null && normalizedQ != q) {
+                calculateScore(entry, normalizedQ, null)
+            } else 0
+            
+            val finalScore = maxOf(score, normalizedScore)
+            if (finalScore > 0) entry to finalScore else null
         }
         .sortedByDescending { it.second }
         .map { it.first }
@@ -229,6 +279,15 @@ class DictionaryProcessor {
         for (meaning in entry.meanings) {
             val gloss = meaning.gloss.lowercase()
             maxMeaningScore = maxOf(maxMeaningScore, getMatchScore(gloss, query))
+            
+            // 2b. Check Chinese Meanings (Boost for non-ASCII queries)
+            val glossCn = meaning.gloss_cn?.lowercase()
+            if (glossCn != null) {
+                val cnScore = getMatchScore(glossCn, query)
+                // If query is not ASCII, give Chinese results higher weight
+                val weight = if (query.any { it.code >= 128 }) 2 else 1
+                maxMeaningScore = maxOf(maxMeaningScore, cnScore * weight)
+            }
         }
         totalScore += maxMeaningScore
 
@@ -275,6 +334,106 @@ class DictionaryProcessor {
 
     fun getJlptStats(): Map<String, Int> {
         return mapOf("total" to jlptMap.size)
+    }
+}
+
+object KanjiNormalizer {
+    private val mapping = mapOf(
+        '龙' to '竜',
+        '马' to '馬',
+        '风' to '風',
+        '义' to '義',
+        '乐' to '楽',
+        '关' to '関',
+        '显' to '顕',
+        '亚' to '亜',
+        '园' to '園',
+        '圆' to '円',
+        '团' to '団',
+        '图' to '図',
+        '声' to '声',
+        '学' to '学',
+        '宝' to '宝',
+        '带' to '帯',
+        '归' to '帰',
+        '庆' to '慶',
+        '庄' to '庄',
+        '广' to '広',
+        '应' to '応',
+        '开' to '開',
+        '弹' to '弾',
+        '从' to '従',
+        '战' to '戦',
+        '戏' to '戯',
+        '执' to '執',
+        '扩' to '拡',
+        '摄' to '撮',
+        '断' to '断',
+        '时' to '時',
+        '旧' to '旧',
+        '昼' to '昼',
+        '晚' to '晩',
+        '检' to '検',
+        '步' to '歩',
+        '气' to '気',
+        '济' to '済',
+        '满' to '満',
+        '浓' to '濃',
+        '烂' to '爛',
+        '爷' to '爺',
+        '牵' to '牽',
+        '犹' to '猶',
+        '现' to '現',
+        '画' to '画',
+        '发' to '発',
+        '盘' to '盤',
+        '真' to '真',
+        '礼' to '礼',
+        '研' to '研',
+        '窍' to '竅',
+        '签' to '籤',
+        '节' to '節',
+        '肃' to '粛',
+        '紧' to '緊',
+        '继' to '継',
+        '练' to '練',
+        '县' to '県',
+        '总' to '総',
+        '联' to '連',
+        '声' to '声',
+        '处' to '処',
+        '备' to '備',
+        '变' to '変',
+        '辞' to '辞',
+        '边' to '辺',
+        '进' to '進',
+        '选' to '選',
+        '邻' to '隣',
+        '酿' to '醸',
+        '释' to '釈',
+        '铁' to '鉄',
+        '钱' to '銭',
+        '锐' to '鋭',
+        '阅' to '閲',
+        '际' to '際',
+        '难' to '難',
+        '颠' to '顛',
+        '馋' to '饞',
+        '马' to '馬',
+        '驳' to '駁',
+        '驻' to '駐',
+        '验' to '験',
+        '骤' to '驟',
+        '高' to '高',
+        '鱼' to '魚',
+        '鲜' to '鮮',
+        '鸟' to '鳥',
+        '鸡' to '鶏',
+        '龙' to '竜'
+    )
+
+    fun normalize(input: String): String {
+        return input.map { mapping[it] ?: it }.joinToString("")
     }
 }
 

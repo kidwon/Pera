@@ -16,6 +16,18 @@ fun main() {
     val resourcesDir = File("src/main/resources")
     val xmlFile = File(resourcesDir, "jmdict_full.xml")
     val outputFile = File(resourcesDir, "dictionary_snapshot.json")
+    val thesaurusDest = File(resourcesDir, "jp_zh_thesaurus.json")
+    val tmpThesaurus = File("/tmp/jp_zh_thesaurus.json")
+
+    if (tmpThesaurus.exists() && !thesaurusDest.exists()) {
+        println("📦 Migrating thesaurus from /tmp to resources...")
+        tmpThesaurus.copyTo(thesaurusDest, overwrite = true)
+        println("✅ Migrated thesaurus successfully")
+    } else if (tmpThesaurus.exists()) {
+        println("🔄 Updating thesaurus in resources from /tmp...")
+        tmpThesaurus.copyTo(thesaurusDest, overwrite = true)
+        println("✅ Updated thesaurus successfully")
+    }
     
     if (!xmlFile.exists()) {
         println("❌ Error: jmdict_full.xml not found at ${xmlFile.absolutePath}")
