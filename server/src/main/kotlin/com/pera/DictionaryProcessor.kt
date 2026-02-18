@@ -97,9 +97,23 @@ class DictionaryProcessor {
     // Map: Word -> Chinese Gloss
     private var chineseThesaurus: Map<String, String> = emptyMap()
 
+    // Custom Dictionary Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class CustomEntry(
+        val term: String,
+        val reading: String,
+        val meanings: List<String>,
+        val chinese_meanings: List<String> = emptyList(),
+        val pos: String? = null,
+        val tags: List<String> = emptyList()
+    )
+
+    private var customEntries: List<CustomEntry> = emptyList()
+
     init {
         loadJlptData()
         loadChineseThesaurus()
+        loadCustomDictionary()
     }
 
     private fun loadChineseThesaurus() {
@@ -114,10 +128,63 @@ class DictionaryProcessor {
                 )
                 println("✅ Loaded ${chineseThesaurus.size} Chinese thesaurus entries")
             } else {
-                println("⚠️ Chinese thesaurus file not found: /jp_zh_thesaurus.json")
+                // Fallback: Try loading from filesystem
+                val file = File("src/main/resources/jp_zh_thesaurus.json")
+                if (file.exists()) {
+                    val jsonContent = file.readText()
+                    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                    chineseThesaurus = mapper.readValue(
+                            jsonContent,
+                            object : com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                    )
+                    println("✅ Loaded ${chineseThesaurus.size} Chinese thesaurus entries from filesystem")
+                } else {
+                    println("⚠️ Chinese thesaurus file not found in classpath or filesystem: /jp_zh_thesaurus.json")
+                }
             }
         } catch (e: Exception) {
             println("⚠️ Could not load Chinese thesaurus: ${e.message}")
+        }
+
+        // Add manual mappings to thesaurus for enrichment of existing entries
+        val manualMap = customEntries
+            .filter { it.chinese_meanings.isNotEmpty() }
+            .associate { it.term to it.chinese_meanings.first() }
+        chineseThesaurus = chineseThesaurus + manualMap
+        println("✅ Added ${manualMap.size} custom entries to Chinese thesaurus.")
+    }
+
+    private fun loadCustomDictionary() {
+        try {
+            // Priority: Project Root (for easier user editing)
+            val schemeFile = File("custom_vocab.json")
+            if (schemeFile.exists()) {
+                val jsonContent = schemeFile.readText()
+                val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                customEntries = mapper.readValue(
+                    jsonContent,
+                    object : com.fasterxml.jackson.core.type.TypeReference<List<CustomEntry>>() {}
+                )
+                println("Loaded ${customEntries.size} custom entries from project root: ${schemeFile.absolutePath}")
+                return
+            }
+
+            // Fallback: Classpath (if packaged)
+            val resource = javaClass.getResource("/custom_vocab.json")
+            if (resource != null) {
+                val jsonContent = resource.readText()
+                val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                customEntries = mapper.readValue(
+                    jsonContent,
+                    object : com.fasterxml.jackson.core.type.TypeReference<List<CustomEntry>>() {}
+                )
+                println("Loaded ${customEntries.size} custom entries from classpath")
+            } else {
+                println("Custom dictionary not found in project root or classpath.")
+            }
+        } catch (e: Exception) {
+            println("Failed to load custom dictionary: ${e.message}")
+            e.printStackTrace()
         }
     }
 
@@ -133,9 +200,21 @@ class DictionaryProcessor {
                         jsonContent, 
                         object : com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
                 )
-                println("Loaded ${jlptMap.size} JLPT entries")
+                println("Loaded ${jlptMap.size} JLPT entries from classpath")
             } else {
-                println("JLPT file not found in classpath: /jlpt_vocab.json")
+                // Fallback: Try loading from filesystem (for DictionaryBuilder)
+                val file = File("src/main/resources/jlpt_vocab.json")
+                if (file.exists()) {
+                    val jsonContent = file.readText()
+                    val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+                    jlptMap = mapper.readValue(
+                            jsonContent, 
+                            object : com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                    )
+                    println("Loaded ${jlptMap.size} JLPT entries from filesystem")
+                } else {
+                    println("JLPT file not found in classpath or filesystem: /jlpt_vocab.json")
+                }
             }
         } catch (e: Exception) {
             println("Failed to load JLPT data: ${e.message}")
@@ -188,6 +267,36 @@ class DictionaryProcessor {
                     )
                 }
             }
+        }
+
+        // Inject Custom Entries (Force add / prioritize)
+        // We do NOT check existingReadingsCheck because we want to ensure our custom definition
+        // (especially with specific Chinese glosses) is present and searchable.
+        // The search logic handles multiple entries with same reading by scoring.
+        var specificCustomAdded = 0
+        
+        for (custom in customEntries) {
+             simplifiedEntries.add(
+                SimplifiedEntry(
+                    ent_seq = "custom_${custom.term.hashCode()}",
+                    kanji = custom.term,
+                    reading = custom.reading,
+                    meanings = custom.meanings.mapIndexed { index, gloss -> 
+                        MeaningDetail(
+                            gloss = gloss, 
+                            gloss_cn = custom.chinese_meanings.getOrNull(index) ?: custom.chinese_meanings.firstOrNull(), 
+                            examples = emptyList()
+                        ) 
+                    },
+                    pitch = null,
+                    jlptLevel = null
+                )
+            )
+            specificCustomAdded++
+        }
+        
+        if (specificCustomAdded > 0) {
+            println("✅ Injected $specificCustomAdded manual custom entries")
         }
         
         return simplifiedEntries
@@ -245,6 +354,11 @@ class DictionaryProcessor {
         // Character normalization for Chinese/Japanese variants
         val normalizedQ = if (!isAscii) KanjiNormalizer.normalize(q) else null
 
+        // DEBUG: Trace execution for specific query
+        if (q.contains("麦当劳") || q.contains("mcdonald")) {
+            println("🔎 DEBUG SEARCH: q='$q', normalizedQ='$normalizedQ', isAscii=$isAscii")
+        }
+
         return entries.mapNotNull { entry ->
             // Try scoring with original query and normalized query
             val score = calculateScore(entry, q, romajiKana)
@@ -253,6 +367,14 @@ class DictionaryProcessor {
             } else 0
             
             val finalScore = maxOf(score, normalizedScore)
+            
+            // DEBUG: Print details if this entry is relevant
+            if ((q.contains("麦当劳") || q.contains("mcdonald")) && (entry.kanji?.contains("麦当劳") == true || entry.meanings.any { it.gloss.lowercase().contains("mcdonald") || it.gloss_cn?.contains("麦当劳") == true })) {
+                println("   👉 Checking Entry: ${entry.kanji} (${entry.reading})")
+                println("      Score: $score (Original), $normalizedScore (Normalized)")
+                println("      Meanings: ${entry.meanings.joinToString { "${it.gloss}|${it.gloss_cn}" }}")
+            }
+
             if (finalScore > 0) entry to finalScore else null
         }
         .sortedByDescending { it.second }
@@ -285,7 +407,8 @@ class DictionaryProcessor {
             if (glossCn != null) {
                 val cnScore = getMatchScore(glossCn, query)
                 // If query is not ASCII, give Chinese results higher weight
-                val weight = if (query.any { it.code >= 128 }) 2 else 1
+                // Drastically increased weight to prioritize Chinese gloss matches
+                val weight = if (query.any { it.code >= 128 }) 100 else 1
                 maxMeaningScore = maxOf(maxMeaningScore, cnScore * weight)
             }
         }
@@ -308,7 +431,7 @@ class DictionaryProcessor {
     }
 
     private fun getMatchScore(target: String?, query: String): Int {
-        if (target == null || target.isEmpty()) return 0
+        if (target.isNullOrEmpty()) return 0
         
         // Exact match
         if (target == query) return 500
@@ -429,7 +552,8 @@ object KanjiNormalizer {
         '鲜' to '鮮',
         '鸟' to '鳥',
         '鸡' to '鶏',
-        '龙' to '竜'
+        '龙' to '竜',
+        '狗' to '犬'
     )
 
     fun normalize(input: String): String {

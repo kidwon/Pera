@@ -43,3 +43,9 @@ debug.log
 # Test/Fake Dirs
 fake_home/
 fake_tmp/
+
+# Custom Vocabulary Backup/Tests
+custom_vocab_v2.json
+test_*.json
+test_*.txt
+test_*.xml

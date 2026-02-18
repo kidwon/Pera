@@ -42,6 +42,15 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+tasks.processResources {
+    exclude("jmdict_full.xml")
+    exclude("jp_zh_thesaurus_test.json")
+    exclude("jmdict_dummy.xml")
+    exclude("jlpt_vocab.json")
+    exclude("custom_vocab*.json")
+    exclude("test_perm.json")
+}
+
 // Task to build dictionary snapshot
 tasks.register<JavaExec>("buildDictionary") {
     group = "application"

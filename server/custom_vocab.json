@@ -1,0 +1,328 @@
+[
+    {
+        "term": "マクドナルド",
+        "reading": "マクドナルド",
+        "meanings": [
+            "McDonald's"
+        ],
+        "chinese_meanings": [
+            "麦当劳"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand"
+        ]
+    },
+    {
+        "term": "マクド",
+        "reading": "マクド",
+        "meanings": [
+            "McDonald's (Abbr)"
+        ],
+        "chinese_meanings": [
+            "麦当劳"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "dialect"
+        ]
+    },
+    {
+        "term": "ケンタッキー",
+        "reading": "ケンタッキー",
+        "meanings": [
+            "KFC"
+        ],
+        "chinese_meanings": [
+            "肯德基"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand"
+        ]
+    },
+    {
+        "term": "ケンタ",
+        "reading": "ケンタ",
+        "meanings": [
+            "KFC (Abbr)"
+        ],
+        "chinese_meanings": [
+            "肯德基"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "colloquial"
+        ]
+    },
+    {
+        "term": "スターバックス",
+        "reading": "スターバックス",
+        "meanings": [
+            "Starbucks"
+        ],
+        "chinese_meanings": [
+            "星巴克"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand"
+        ]
+    },
+    {
+        "term": "スタバ",
+        "reading": "スタバ",
+        "meanings": [
+            "Starbucks (Abbr)"
+        ],
+        "chinese_meanings": [
+            "星巴克"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "colloquial"
+        ]
+    },
+    {
+        "term": "ユニクロ",
+        "reading": "ユニクロ",
+        "meanings": [
+            "Uniqlo"
+        ],
+        "chinese_meanings": [
+            "优衣库"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand"
+        ]
+    },
+    {
+        "term": "ディズニーランド",
+        "reading": "ディズニーランド",
+        "meanings": [
+            "Disneyland"
+        ],
+        "chinese_meanings": [
+            "迪士尼乐园"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "place"
+        ]
+    },
+    {
+        "term": "セブンイレブン",
+        "reading": "セブンイレブン",
+        "meanings": [
+            "7-Eleven"
+        ],
+        "chinese_meanings": [
+            "7-11"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "conbini"
+        ]
+    },
+    {
+        "term": "ローソン",
+        "reading": "ローソン",
+        "meanings": [
+            "Lawson"
+        ],
+        "chinese_meanings": [
+            "罗森"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "conbini"
+        ]
+    },
+    {
+        "term": "ファミリーマート",
+        "reading": "ファミリーマート",
+        "meanings": [
+            "FamilyMart"
+        ],
+        "chinese_meanings": [
+            "全家"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "conbini"
+        ]
+    },
+    {
+        "term": "ユーチューブ",
+        "reading": "ユーチューブ",
+        "meanings": [
+            "YouTube"
+        ],
+        "chinese_meanings": [
+            "油管"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "internet"
+        ]
+    },
+    {
+        "term": "グーグル",
+        "reading": "グーグル",
+        "meanings": [
+            "Google"
+        ],
+        "chinese_meanings": [
+            "谷歌"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "internet"
+        ]
+    },
+    {
+        "term": "ツイッター",
+        "reading": "ツイッター",
+        "meanings": [
+            "Twitter"
+        ],
+        "chinese_meanings": [
+            "推特"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "internet"
+        ]
+    },
+    {
+        "term": "フェイスブック",
+        "reading": "フェイスブック",
+        "meanings": [
+            "Facebook"
+        ],
+        "chinese_meanings": [
+            "脸书"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "internet"
+        ]
+    },
+    {
+        "term": "インスタグラム",
+        "reading": "インスタグラム",
+        "meanings": [
+            "Instagram"
+        ],
+        "chinese_meanings": [
+            "Ins"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "internet"
+        ]
+    },
+    {
+        "term": "アップル",
+        "reading": "アップル",
+        "meanings": [
+            "Apple"
+        ],
+        "chinese_meanings": [
+            "苹果"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "tech"
+        ]
+    },
+    {
+        "term": "ソニー",
+        "reading": "ソニー",
+        "meanings": [
+            "Sony"
+        ],
+        "chinese_meanings": [
+            "索尼"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "tech"
+        ]
+    },
+    {
+        "term": "トヨタ",
+        "reading": "トヨタ",
+        "meanings": [
+            "Toyota"
+        ],
+        "chinese_meanings": [
+            "丰田"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "car"
+        ]
+    },
+    {
+        "term": "ホンダ",
+        "reading": "ホンダ",
+        "meanings": [
+            "Honda"
+        ],
+        "chinese_meanings": [
+            "本田"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "car"
+        ]
+    },
+    {
+        "term": "ニンテンドー",
+        "reading": "ニンテンドー",
+        "meanings": [
+            "Nintendo"
+        ],
+        "chinese_meanings": [
+            "任天堂"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "game"
+        ]
+    },
+    {
+        "term": "任天堂",
+        "reading": "にんてんどう",
+        "meanings": [
+            "Nintendo"
+        ],
+        "chinese_meanings": [
+            "任天堂"
+        ],
+        "pos": "noun",
+        "tags": [
+            "brand",
+            "game"
+        ]
+    }
+]
