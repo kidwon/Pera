@@ -1,0 +1,10 @@
+tunnel: bab7b42e-bad0-4bb2-9d49-66ed35ec89e1
+credentials-file: /Users/kid/.cloudflared/bab7b42e-bad0-4bb2-9d49-66ed35ec89e1.json
+
+ingress:
+  - hostname: api.perapera.me
+    service: http://localhost:8082
+  - service: http_status:404
+
+# Force HTTP2 for stability (avoid QUIC timeout issues)
+protocol: http2
