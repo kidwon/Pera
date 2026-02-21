@@ -27,7 +27,8 @@ function StudyContent() {
     const { speak } = useTTS();
 
     const [cards, setCards] = useState<any[]>([]);
-    const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [addedCardIds, setAddedCardIds] = useState<Set<string>>(new Set());
 
     // Global fetch state
     const [globalCards, setGlobalCards] = useState<any[] | null>(null);
@@ -81,44 +82,46 @@ function StudyContent() {
 
     useEffect(() => {
         if (activeCards) {
-            // Filter out cards that we have already reviewed in this session
-            setCards(activeCards.filter((c: any) => !reviewedIds.has(c._id)));
+            setCards(activeCards);
+            setCurrentIndex(0);
         }
-    }, [activeCards, reviewedIds]);
+    }, [activeCards]);
 
     const handleSwipe = async (direction: "left" | "right") => {
-        if (cards.length === 0) return;
+        if (direction === "right") {
+            // Go back to previous card
+            setCurrentIndex(prev => Math.max(0, prev - 1));
+            return;
+        }
 
-        const currentCard = cards[0];
-        const rating = direction === "right" ? 3 : 1; // Right = Good (3), Left = Again (1)
+        // Left swipe = advance
+        if (currentIndex >= cards.length - 1) return;
 
-        // Optimistic update: Remove card from stack immediately and track its ID
-        setReviewedIds(prev => new Set(prev).add(currentCard._id));
-        setCards(prevCards => prevCards.slice(1));
+        const currentCard = cards[currentIndex];
 
-        if (currentCard.isGlobal) {
-            // Global Mode Logic
-            // If they swipe left (rating 1 == Again/Hard), it means they don't know it well. 
-            // Automatically silently save it to their Convex collection!
-            if (rating === 1) {
-                try {
-                    await addCard({
-                        ent_seq: currentCard.ent_seq,
-                        kanji: currentCard.kanji,
-                        reading: currentCard.reading,
-                        meanings: currentCard.meanings,
-                        pitch: currentCard.pitch,
-                        meaningIndex: 0, // Assume primary meaning
-                        jlptLevel: currentCard.jlptLevel,
-                    });
-                    console.log(`Saved ${currentCard.kanji || currentCard.reading} from global library to your cards context.`);
-                } catch (e) {
-                    console.error("Failed to auto-save global card:", e);
-                }
-            }
-        } else {
-            // Standard SRS Mode Logic
-            await reviewCard({ cardId: currentCard._id, rating });
+        if (!currentCard.isGlobal) {
+            // SRS mode: record rating on advance (left = next)
+            await reviewCard({ cardId: currentCard._id, rating: 3 });
+        }
+
+        setCurrentIndex(prev => prev + 1);
+    };
+
+    const handleAddToMyCards = async (card: any) => {
+        if (addedCardIds.has(card._id)) return;
+        try {
+            await addCard({
+                ent_seq: card.ent_seq,
+                kanji: card.kanji,
+                reading: card.reading,
+                meanings: card.meanings,
+                pitch: card.pitch,
+                meaningIndex: 0,
+                jlptLevel: card.jlptLevel,
+            });
+            setAddedCardIds(prev => new Set(prev).add(card._id));
+        } catch (e) {
+            console.error("Failed to add card:", e);
         }
     };
 
@@ -156,7 +159,8 @@ function StudyContent() {
         );
     }
 
-    const currentCard = cards[0];
+    const currentCard = cards[currentIndex];
+    if (!currentCard) return <div className="flex items-center justify-center min-h-screen">...</div>;
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-muted/20 overflow-hidden relative">
@@ -188,7 +192,7 @@ function StudyContent() {
                 <LanguageSwitcher />
             </div>
             <div className="absolute top-4 right-4 text-sm text-muted-foreground bg-background/50 px-2 py-1 rounded-md backdrop-blur-sm z-10 hidden sm:block">
-                {cards.length} {t.appName}
+                {currentIndex + 1} / {cards.length}
             </div>
 
             <Flashcard
@@ -212,98 +216,123 @@ function StudyContent() {
                     </div>
                 }
                 back={
-                    <div className="flex flex-col gap-4 relative h-full justify-center">
-                        {currentCard.kanji && currentCard.reading && (
-                            <div className="text-xl text-muted-foreground">{currentCard.reading}</div>
-                        )}
-                        <div className="text-lg text-left w-full space-y-2 px-4">
-                            {currentCard.meanings?.length > 0 ? (
-                                currentCard.meanings.map((m: any, idx: number) => {
-                                    const visibleGlosses = [];
+                    <div className="flex flex-col w-full h-full relative">
+                        {/* Scrollable Content Area */}
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden w-full px-2 py-4 space-y-4 flex flex-col items-center">
+                            {currentCard.kanji && currentCard.reading && (
+                                <div className="text-xl text-muted-foreground shrink-0">{currentCard.reading}</div>
+                            )}
+                            <div className="text-lg text-left w-full space-y-2">
+                                {currentCard.meanings?.length > 0 ? (
+                                    currentCard.meanings.map((m: any, idx: number) => {
+                                        const visibleGlosses = [];
 
-                                    for (const [lang, translations] of Object.entries(m.glosses || {})) {
-                                        if (visibleLanguages.includes(lang)) {
-                                            const langPrefix = lang === 'eng' ? null : `[${lang.toUpperCase()}]`;
-                                            visibleGlosses.push(
-                                                <span key={lang}>
-                                                    {langPrefix && <span className="font-medium text-[10.5px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground mr-1.5">{langPrefix}</span>}
-                                                    {(translations as string[]).join("; ")}
-                                                </span>
-                                            );
+                                        for (const [lang, translations] of Object.entries(m.glosses || {})) {
+                                            if (visibleLanguages.includes(lang)) {
+                                                const langPrefix = lang === 'eng' ? null : `[${lang.toUpperCase()}]`;
+                                                visibleGlosses.push(
+                                                    <span key={lang}>
+                                                        {langPrefix && <span className="font-medium text-[10.5px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground mr-1.5">{langPrefix}</span>}
+                                                        {(translations as string[]).join("; ")}
+                                                    </span>
+                                                );
+                                            }
                                         }
-                                    }
 
-                                    if (m.gloss && (!m.glosses || Object.keys(m.glosses).length === 0) && visibleLanguages.includes("eng")) {
-                                        visibleGlosses.push(<span key="eng-legacy">{m.gloss}</span>);
-                                    }
+                                        if (m.gloss && (!m.glosses || Object.keys(m.glosses).length === 0) && visibleLanguages.includes("eng")) {
+                                            visibleGlosses.push(<span key="eng-legacy">{m.gloss}</span>);
+                                        }
 
-                                    if (visibleGlosses.length === 0 && (!m.gloss_cn || !visibleLanguages.includes("cn"))) return null;
+                                        if (visibleGlosses.length === 0 && (!m.gloss_cn || !visibleLanguages.includes("cn"))) return null;
 
-                                    return (
-                                        <div key={idx} className="bg-background/40 p-3 rounded-md space-y-1">
-                                            {m.gloss_cn && visibleLanguages.includes("cn") && (
-                                                <div className="font-bold text-primary text-xl mb-1">{m.gloss_cn}</div>
-                                            )}
-                                            <div className="text-muted-foreground leading-relaxed flex flex-wrap items-center gap-1.5">
-                                                <span className="font-medium mr-1">{idx + 1}.</span>
-                                                {m.tags && Array.isArray(m.tags) && m.tags.map((tag: string) => (
-                                                    <span key={tag} className="px-1.5 py-0.5 bg-secondary/50 text-secondary-foreground text-[10px] rounded border uppercase">
-                                                        {tag}
-                                                    </span>
-                                                ))}
-                                                {visibleGlosses.map((g, gi) => (
-                                                    <span key={gi}>
-                                                        {g}
-                                                        {gi < visibleGlosses.length - 1 ? <span className="mx-1.5 text-muted-foreground/40">·</span> : ""}
-                                                    </span>
-                                                ))}
+                                        return (
+                                            <div key={idx} className="bg-background/40 p-3 rounded-md space-y-1">
+                                                {m.gloss_cn && visibleLanguages.includes("cn") && (
+                                                    <div className="font-bold text-primary text-xl mb-1">{m.gloss_cn}</div>
+                                                )}
+                                                <div className="text-muted-foreground leading-relaxed flex flex-wrap items-center gap-1.5">
+                                                    <span className="font-medium mr-1">{idx + 1}.</span>
+                                                    {m.tags && Array.isArray(m.tags) && m.tags.map((tag: string) => {
+                                                        const isPos = tag.includes('noun') || tag.includes('verb') || tag.includes('adjective') || tag.includes('adverb');
+                                                        const badgeVariant = isPos ? "bg-muted/60 text-muted-foreground" : "bg-primary/10 text-primary border-primary/20";
+                                                        const translatedTag = t.tags?.[tag.toLowerCase() as keyof typeof t.tags] || tag;
+                                                        return (
+                                                            <span key={tag} className={`px-1.5 py-0.5 text-[10.5px] font-medium rounded border uppercase tracking-wide ${badgeVariant}`}>
+                                                                {translatedTag}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {visibleGlosses.map((g, gi) => (
+                                                        <span key={gi}>
+                                                            {g}
+                                                            {gi < visibleGlosses.length - 1 ? <span className="mx-1.5 text-muted-foreground/40">·</span> : ""}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-center text-muted-foreground">No meanings available</div>
+                                )}
+                            </div>
+                            {currentCard.meanings?.some((m: any) => m.examples?.length > 0) && (
+                                <div className="mt-4 text-sm text-left w-full bg-background/50 p-3 rounded-md shrink-0">
+                                    {currentCard.meanings.map((m: any, i: number) => (
+                                        <div key={i} className="space-y-2">
+                                            {m.examples?.map((ex: any, j: number) => (
+                                                <div key={j} className="border-l-2 border-primary/30 pl-2">
+                                                    <div>{ex.text}</div>
+                                                    <div className="text-xs text-muted-foreground">{ex.text_ja}</div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="text-center text-muted-foreground">No meanings available</div>
+                                    ))}
+                                </div>
                             )}
                         </div>
-                        {currentCard.meanings?.some((m: any) => m.examples?.length > 0) && (
-                            <div className="mt-4 text-sm text-left w-full bg-background/50 p-3 rounded-md">
-                                {currentCard.meanings.map((m: any, i: number) => (
-                                    <div key={i} className="space-y-2">
-                                        {m.examples?.map((ex: any, j: number) => (
-                                            <div key={j} className="border-l-2 border-primary/30 pl-2">
-                                                <div>{ex.text}</div>
-                                                <div className="text-xs text-muted-foreground">{ex.text_ja}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <div className="mt-4 flex justify-center" onClick={(e) => e.stopPropagation()}>
+                        {/* Fixed bottom bar: video button */}
+                        <div className="shrink-0 flex justify-center pt-2 pb-1 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
                             <VideoDrawer query={currentCard.kanji || currentCard.reading || ""} />
                         </div>
+
+                        {/* Fixed Audio Button at Bottom Right */}
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="absolute bottom-2 right-2 rounded-full hover:bg-muted"
+                            className="absolute bottom-0 right-0 rounded-full hover:bg-muted bg-background/80 backdrop-blur-sm shadow-sm border border-border/50"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 speak(currentCard.reading || currentCard.kanji || "");
                             }}
                         >
-                            <Volume2 className="h-6 w-6 text-muted-foreground" />
+                            <Volume2 className="h-5 w-5 text-muted-foreground" />
                         </Button>
                     </div>
                 }
                 onSwipe={handleSwipe}
             />
 
+            {/* Add to My Cards button (global cards only) */}
+            {currentCard?.isGlobal && (
+                <div className="mt-4" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                        variant={addedCardIds.has(currentCard._id) ? "secondary" : "default"}
+                        size="sm"
+                        disabled={addedCardIds.has(currentCard._id)}
+                        onClick={() => handleAddToMyCards(currentCard)}
+                        className="shadow-sm gap-1.5"
+                    >
+                        {addedCardIds.has(currentCard._id) ? `✓ ${t.added}` : `+ ${t.addToMyCards || 'Add to My Cards'}`}
+                    </Button>
+                </div>
+            )}
+
             {/* Helper text */}
-            < div className="mt-12 text-sm text-muted-foreground animate-pulse" >
-                {t.appName}: {t.easy} (&rarr;) | {t.again} (&larr;)
-            </div >
-        </div >
+            <div className="mt-4 text-sm text-muted-foreground">
+                {t.prevCard || '上一张'} → &nbsp;|&nbsp; ← {t.nextCard || '下一张'}
+            </div>
+        </div>
     );
 }
 

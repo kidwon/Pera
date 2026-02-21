@@ -355,9 +355,10 @@ export default function SearchPage() {
                                                         {m.tags && m.tags.length > 0 && m.tags.map(tag => {
                                                             const isPos = tag.includes('noun') || tag.includes('verb') || tag.includes('adjective') || tag.includes('adverb');
                                                             const badgeVariant = isPos ? "bg-muted/60 text-muted-foreground" : "bg-primary/10 text-primary border-primary/20";
+                                                            const translatedTag = t.tags?.[tag.toLowerCase() as keyof typeof t.tags] || tag;
                                                             return (
                                                                 <span key={tag} className={`mr-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded border uppercase tracking-wider ${badgeVariant}`}>
-                                                                    {tag}
+                                                                    {translatedTag}
                                                                 </span>
                                                             );
                                                         })}
@@ -493,9 +494,9 @@ export default function SearchPage() {
                 <TabsContent value="library" className="mt-0">
                     <div className="flex flex-col items-center justify-center py-12 space-y-6">
                         <div className="text-center space-y-2">
-                            <h2 className="text-2xl font-bold">Global JLPT Library</h2>
+                            <h2 className="text-2xl font-bold">{t.libraryTitle}</h2>
                             <p className="text-muted-foreground max-w-sm">
-                                Study all words for a specific JLPT level. Words you mark as difficult will automatically be added to your My Cards collection.
+                                {t.libraryDesc}
                             </p>
                         </div>
 
@@ -582,9 +583,10 @@ export default function SearchPage() {
                                                     {meaning.tags?.map(tag => {
                                                         const isPos = tag.includes('noun') || tag.includes('verb') || tag.includes('adjective') || tag.includes('adverb');
                                                         const badgeVariant = isPos ? "bg-muted/60 text-muted-foreground" : "bg-primary/10 text-primary border-primary/20";
+                                                        const translatedTag = t.tags?.[tag.toLowerCase() as keyof typeof t.tags] || tag;
                                                         return (
                                                             <span key={tag} className={`px-1.5 py-0.5 text-[10px] font-medium rounded border uppercase tracking-wider ${badgeVariant}`}>
-                                                                {tag}
+                                                                {translatedTag}
                                                             </span>
                                                         );
                                                     })}

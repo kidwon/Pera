@@ -43,15 +43,21 @@ export function Flashcard({ front, back, onSwipe }: FlashcardProps) {
                 transition={{ duration: 0.6 }}
             >
                 {/* Front */}
-                <div className="absolute backface-hidden w-full h-full">
+                <div
+                    className="absolute backface-hidden w-full h-full"
+                    style={{ display: isFlipped ? 'none' : 'block' }}
+                >
                     <div className="w-full h-full bg-card border rounded-xl shadow-xl flex items-center justify-center p-6 text-center">
                         {front}
                     </div>
                 </div>
 
                 {/* Back */}
-                <div className="absolute backface-hidden w-full h-full rotate-y-180">
-                    <div className="w-full h-full bg-card border rounded-xl shadow-xl flex items-center justify-center p-6 text-center">
+                <div
+                    className="absolute backface-hidden w-full h-full rotate-y-180"
+                    style={{ display: isFlipped ? 'block' : 'none' }}
+                >
+                    <div className="w-full h-full bg-card border rounded-xl shadow-xl flex flex-col p-6 items-center text-center">
                         {back}
                     </div>
                 </div>
