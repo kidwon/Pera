@@ -169,7 +169,7 @@ function StudyContent() {
                     variant="outline"
                     size="sm"
                     className="bg-background/80 backdrop-blur-sm"
-                    onClick={() => router.back()}
+                    onClick={() => source === "global" ? router.push("/search?tab=library") : router.back()}
                 >
                     &larr; {t.back}
                 </Button>
@@ -191,8 +191,11 @@ function StudyContent() {
                 </Button>
                 <LanguageSwitcher />
             </div>
-            <div className="absolute top-4 right-4 text-sm text-muted-foreground bg-background/50 px-2 py-1 rounded-md backdrop-blur-sm z-10 hidden sm:block">
-                {currentIndex + 1} / {cards.length}
+            <div className="absolute top-4 right-4 text-sm text-muted-foreground bg-background/50 px-2 py-1 rounded-md backdrop-blur-sm z-10 hidden sm:flex items-center gap-2">
+                {source === "global" && level && (
+                    <span className="font-medium text-foreground">{t.libraryTab} {level}</span>
+                )}
+                <span>{currentIndex + 1} / {cards.length}</span>
             </div>
 
             <Flashcard

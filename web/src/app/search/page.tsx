@@ -105,8 +105,11 @@ export default function SearchPage() {
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
-            if (params.get("tab") === "myCards") {
+            const tab = params.get("tab");
+            if (tab === "myCards") {
                 setActiveTab("myCards");
+            } else if (tab === "library") {
+                setActiveTab("library");
             }
         }
     }, []);
