@@ -46,7 +46,13 @@ data class Sense(
     @JacksonXmlElementWrapper(useWrapping = false)
     val example: List<Example>? = null,
     @JacksonXmlElementWrapper(useWrapping = false)
-    val stagr: List<String>? = null // Reading restriction
+    val stagr: List<String>? = null, // Reading restriction
+    @JacksonXmlElementWrapper(useWrapping = false)
+    val pos: List<String>? = null,
+    @JacksonXmlElementWrapper(useWrapping = false)
+    val misc: List<String>? = null,
+    @JacksonXmlElementWrapper(useWrapping = false)
+    val field: List<String>? = null
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -56,13 +62,16 @@ data class Example(
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class Gloss(
+class Gloss {
     @JacksonXmlProperty(isAttribute = true, localName = "lang", namespace = "http://www.w3.org/XML/1998/namespace")
-    val lang: String? = null,
+    var lang: String? = null
+    
+    @JacksonXmlProperty(isAttribute = true)
+    var g_type: String? = null
     
     @JacksonXmlText
-    val text: String
-)
+    var text: String = ""
+}
 
 // Simplified output for the frontend
 @Serializable
@@ -80,6 +89,7 @@ data class MeaningDetail(
     val gloss: String? = null, // Legacy compatibility
     val glosses: Map<String, List<String>> = emptyMap(), // { "eng": ["cat"], "dut": ["kat"] }
     val gloss_cn: String? = null, // Chinese definition
+    val tags: List<String> = emptyList(), // e.g., ["sl", "abbr", "n"]
     val examples: List<ExamplePair> = emptyList()
 )
 
@@ -295,6 +305,7 @@ class DictionaryProcessor {
                         MeaningDetail(
                             glosses = mapOf("eng" to listOf(gloss)), 
                             gloss_cn = custom.chinese_meanings.getOrNull(index) ?: custom.chinese_meanings.firstOrNull(), 
+                            tags = emptyList(),
                             examples = emptyList()
                         ) 
                     },
@@ -350,9 +361,18 @@ class DictionaryProcessor {
                 ExamplePair(text = ex.ex_text, text_ja = ex.ex_text_ja)
             } ?: emptyList()
             
+            val tags = mutableListOf<String>()
+            
+            // Helper to clean up verbose DTD entities like "noun (common) (futsuumeishi)" -> "noun (common)"
+            val cleanTag = { t: String -> t.replace(Regex("\\s\\([a-z-]+\\)$"), "") }
+            
+            sense.pos?.let { tags.addAll(it.map(cleanTag)) }
+            sense.misc?.let { tags.addAll(it.map(cleanTag)) }
+            sense.field?.let { tags.addAll(it.map(cleanTag)) }
+            
             // Only attach Chinese gloss to the first sense (primary meaning)
             val cn = if (index == 0) chineseGloss else null
-            MeaningDetail(glosses = glossMap, gloss_cn = cn, examples = examples)
+            MeaningDetail(glosses = glossMap, gloss_cn = cn, tags = tags.distinct(), examples = examples)
         }
     }
 

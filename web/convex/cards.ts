@@ -112,6 +112,7 @@ export const addCard = mutation({
                     gloss: v.optional(v.string()), // Legacy compatibility
                     glosses: v.optional(v.record(v.string(), v.array(v.string()))),
                     gloss_cn: v.optional(v.string()),
+                    tags: v.optional(v.array(v.string())),
                     examples: v.optional(
                         v.array(
                             v.object({
@@ -215,6 +216,7 @@ export const seed = mutation({
                                 gloss: typeof m.gloss === 'string' ? m.gloss : undefined,
                                 glosses: m.glosses || {},
                                 gloss_cn: typeof m.gloss_cn === 'string' ? m.gloss_cn : undefined,
+                                tags: Array.isArray(m.tags) ? m.tags.map(String) : undefined,
                                 examples: Array.isArray(m.examples) ? m.examples.map((ex: any) => ({
                                     text: String(ex.text || ""),
                                     text_ja: String(ex.text_ja || ""),

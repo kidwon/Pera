@@ -17,6 +17,7 @@ export default defineSchema({
                 gloss: v.optional(v.string()), // Legacy compatibility
                 glosses: v.optional(v.record(v.string(), v.array(v.string()))), // { "eng": ["..."], "ger": ["..."] }
                 gloss_cn: v.optional(v.string()), // Chinese definition if available
+                tags: v.optional(v.array(v.string())), // e.g., ["sl", "abbr", "n"]
                 examples: v.optional(
                     v.array(
                         v.object({

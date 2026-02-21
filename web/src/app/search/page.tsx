@@ -7,7 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Check, Volume2, Trash2 } from "lucide-react";
+import { Plus, Check, Volume2, Trash2, Settings } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { SimpleDialog } from "@/components/ui/simple-dialog";
 import { YouGlishPlayer } from "@/components/YouGlishPlayer";
@@ -23,6 +23,7 @@ interface SearchResult {
         gloss?: string;
         glosses: Record<string, string[]>;
         gloss_cn?: string | null;
+        tags?: string[];
         examples?: {
             text: string;
             text_ja: string;
@@ -68,6 +69,38 @@ export default function SearchPage() {
     const [showVideo, setShowVideo] = useState(false);
     const [activeTab, setActiveTab] = useState("search");
     const [selectedJlptLevel, setSelectedJlptLevel] = useState<string | null>(null);
+    const [visibleLanguages, setVisibleLanguages] = useState<string[]>(['eng', 'cn']);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('visibleLanguages');
+            if (saved) {
+                try { setVisibleLanguages(JSON.parse(saved)); } catch (e) { }
+            }
+        }
+    }, []);
+
+    const toggleLanguage = (lang: string) => {
+        const newLangs = visibleLanguages.includes(lang)
+            ? visibleLanguages.filter(l => l !== lang)
+            : [...visibleLanguages, lang];
+        setVisibleLanguages(newLangs);
+        localStorage.setItem('visibleLanguages', JSON.stringify(newLangs));
+    };
+
+    const AVAILABLE_LANGUAGES = [
+        { code: 'eng', label: 'English' },
+        { code: 'cn', label: '中文' },
+        { code: 'dut', label: 'Nederlands' },
+        { code: 'fre', label: 'Français' },
+        { code: 'ger', label: 'Deutsch' },
+        { code: 'hun', label: 'Magyar' },
+        { code: 'rus', label: 'Русский' },
+        { code: 'slv', label: 'Slovenščina' },
+        { code: 'spa', label: 'Español' },
+        { code: 'swe', label: 'Svenska' }
+    ];
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -142,6 +175,7 @@ export default function SearchPage() {
                         gloss: (result.meanings[meaningIndex] as any).gloss || (result.meanings[meaningIndex].glosses && result.meanings[meaningIndex].glosses["eng"] ? result.meanings[meaningIndex].glosses["eng"].join("; ") : ""),
                         glosses: result.meanings[meaningIndex].glosses || {},
                         gloss_cn: result.meanings[meaningIndex].gloss_cn ?? undefined,
+                        tags: result.meanings[meaningIndex].tags || [],
                         examples: result.meanings[meaningIndex].examples || [],
                     }
                 ],
@@ -182,8 +216,32 @@ export default function SearchPage() {
         <div className="container mx-auto max-w-2xl p-4 min-h-screen pb-20">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-center flex-1 ml-10">{t.appName}</h1>
-                <LanguageSwitcher />
+                <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)}>
+                        <Settings className="w-5 h-5 text-muted-foreground hover:text-primary" />
+                    </Button>
+                    <LanguageSwitcher />
+                </div>
             </div>
+
+            <SimpleDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Translation Settings">
+                <div className="space-y-4 py-2">
+                    <h3 className="font-semibold text-sm text-muted-foreground border-b pb-2">Visible Languages</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                        {AVAILABLE_LANGUAGES.map(lang => (
+                            <label key={lang.code} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-gray-300 w-4 h-4 accent-primary"
+                                    checked={visibleLanguages.includes(lang.code)}
+                                    onChange={() => toggleLanguage(lang.code)}
+                                />
+                                <span className="text-sm">{lang.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            </SimpleDialog>
 
             <Tabs defaultValue="search" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 mb-4">
@@ -265,12 +323,51 @@ export default function SearchPage() {
                                         </div>
                                         <div className="text-sm text-muted-foreground line-clamp-2">
                                             {result.meanings.map((m, i) => {
-                                                const enGlosses = m.glosses && m.glosses["eng"] ? m.glosses["eng"].join("; ") : m.gloss;
+                                                const visibleGlosses = [];
+
+                                                if (visibleLanguages.includes("cn") && m.gloss_cn) {
+                                                    visibleGlosses.push(
+                                                        <span key="cn"><span className="text-primary/80 font-medium">[{m.gloss_cn}] </span></span>
+                                                    );
+                                                }
+
+                                                for (const [lang, translations] of Object.entries(m.glosses || {})) {
+                                                    if (visibleLanguages.includes(lang)) {
+                                                        const langPrefix = lang === 'eng' ? null : `[${lang.toUpperCase()}] `;
+                                                        visibleGlosses.push(
+                                                            <span key={lang}>
+                                                                {langPrefix && <span className="font-medium text-[10.5px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground mr-1">{lang.toUpperCase()}</span>}
+                                                                {translations.join("; ")}
+                                                            </span>
+                                                        );
+                                                    }
+                                                }
+
+                                                // Legacy string fallback if mapping hasn't triggered yet
+                                                if (m.gloss && (!m.glosses || Object.keys(m.glosses).length === 0) && visibleLanguages.includes("eng")) {
+                                                    visibleGlosses.push(<span key="eng-legacy">{m.gloss}</span>);
+                                                }
+
+                                                if (visibleGlosses.length === 0) return null;
+
                                                 return (
-                                                    <span key={i}>
-                                                        {m.gloss_cn ? <span className="text-primary/80 font-medium">[{m.gloss_cn}] </span> : null}
-                                                        {enGlosses}
-                                                        {i < result.meanings.length - 1 && enGlosses ? "; " : ""}
+                                                    <span key={i} className="leading-relaxed">
+                                                        {m.tags && m.tags.length > 0 && m.tags.map(tag => {
+                                                            const isPos = tag.includes('noun') || tag.includes('verb') || tag.includes('adjective') || tag.includes('adverb');
+                                                            const badgeVariant = isPos ? "bg-muted/60 text-muted-foreground" : "bg-primary/10 text-primary border-primary/20";
+                                                            return (
+                                                                <span key={tag} className={`mr-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded border uppercase tracking-wider ${badgeVariant}`}>
+                                                                    {tag}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                        {visibleGlosses.map((g, gi) => (
+                                                            <span key={gi}>
+                                                                {g}
+                                                                {gi < visibleGlosses.length - 1 ? <span className="mx-1 text-muted-foreground/40">·</span> : ""}
+                                                            </span>
+                                                        ))}
+                                                        {i < result.meanings.length - 1 ? "; " : ""}
                                                     </span>
                                                 );
                                             })}
@@ -462,17 +559,48 @@ export default function SearchPage() {
                             {selectedResult.meanings.map((meaning, index) => {
                                 const key = `${selectedResult.ent_seq}:${index}`;
                                 const isAdded = addedKeys.has(key);
+
+                                // Determine if this meaning block has any content visible right now
+                                const hasCn = meaning.gloss_cn && visibleLanguages.includes("cn");
+                                const hasOtherLang = Object.keys(meaning.glosses || {}).some(lang => visibleLanguages.includes(lang));
+                                const hasLegacyEng = meaning.gloss && (!meaning.glosses || Object.keys(meaning.glosses).length === 0) && visibleLanguages.includes("eng");
+
+                                // Skip rendering an empty box
+                                if (!hasCn && !hasOtherLang && !hasLegacyEng) return null;
+
                                 return (
                                     <div key={index} className="p-3 rounded-md bg-muted/30 border">
                                         <div className="flex items-start justify-between mb-2">
                                             <div className="space-y-1">
-                                                {meaning.gloss_cn && (
-                                                    <div className="text-xl font-bold text-primary">
+                                                {meaning.gloss_cn && visibleLanguages.includes("cn") && (
+                                                    <div className="text-lg font-bold text-primary">
                                                         {meaning.gloss_cn}
                                                     </div>
                                                 )}
-                                                <div className="text-muted-foreground">
-                                                    {index + 1}. {(meaning.glosses && meaning.glosses["eng"] ? meaning.glosses["eng"].join("; ") : meaning.gloss) || ""}
+                                                <div className="text-muted-foreground leading-relaxed flex flex-wrap items-center gap-1.5 mt-1">
+                                                    <span className="font-medium mr-1">{index + 1}.</span>
+                                                    {meaning.tags?.map(tag => {
+                                                        const isPos = tag.includes('noun') || tag.includes('verb') || tag.includes('adjective') || tag.includes('adverb');
+                                                        const badgeVariant = isPos ? "bg-muted/60 text-muted-foreground" : "bg-primary/10 text-primary border-primary/20";
+                                                        return (
+                                                            <span key={tag} className={`px-1.5 py-0.5 text-[10px] font-medium rounded border uppercase tracking-wider ${badgeVariant}`}>
+                                                                {tag}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {Object.entries(meaning.glosses || {}).filter(([lang]) => visibleLanguages.includes(lang)).map(([lang, translations], gIdx, arr) => {
+                                                        const langPrefix = lang === 'eng' ? null : `[${lang.toUpperCase()}]`;
+                                                        return (
+                                                            <span key={lang}>
+                                                                {langPrefix && <span className="font-medium text-[10.5px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground mr-1.5">{langPrefix}</span>}
+                                                                {translations.join("; ")}
+                                                                {gIdx < arr.length - 1 ? <span className="mx-1.5 text-muted-foreground/40">·</span> : ""}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {meaning.gloss && (!meaning.glosses || Object.keys(meaning.glosses).length === 0) && visibleLanguages.includes("eng") && (
+                                                        <span>{meaning.gloss}</span>
+                                                    )}
                                                 </div>
                                             </div>
                                             <Button

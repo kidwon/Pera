@@ -32,6 +32,17 @@ function StudyContent() {
     // Global fetch state
     const [globalCards, setGlobalCards] = useState<any[] | null>(null);
 
+    const [visibleLanguages, setVisibleLanguages] = useState<string[]>(['eng', 'cn']);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('visibleLanguages');
+            if (saved) {
+                try { setVisibleLanguages(JSON.parse(saved)); } catch (e) { }
+            }
+        }
+    }, []);
+
     useEffect(() => {
         if (source === "global" && level) {
             const fetchGlobal = async () => {
@@ -208,11 +219,45 @@ function StudyContent() {
                         <div className="text-lg text-left w-full space-y-2 px-4">
                             {currentCard.meanings?.length > 0 ? (
                                 currentCard.meanings.map((m: any, idx: number) => {
-                                    const enStr = (m.glosses && m.glosses.eng ? m.glosses.eng.join("; ") : m.gloss) || "";
+                                    const visibleGlosses = [];
+
+                                    for (const [lang, translations] of Object.entries(m.glosses || {})) {
+                                        if (visibleLanguages.includes(lang)) {
+                                            const langPrefix = lang === 'eng' ? null : `[${lang.toUpperCase()}]`;
+                                            visibleGlosses.push(
+                                                <span key={lang}>
+                                                    {langPrefix && <span className="font-medium text-[10.5px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground mr-1.5">{langPrefix}</span>}
+                                                    {(translations as string[]).join("; ")}
+                                                </span>
+                                            );
+                                        }
+                                    }
+
+                                    if (m.gloss && (!m.glosses || Object.keys(m.glosses).length === 0) && visibleLanguages.includes("eng")) {
+                                        visibleGlosses.push(<span key="eng-legacy">{m.gloss}</span>);
+                                    }
+
+                                    if (visibleGlosses.length === 0 && (!m.gloss_cn || !visibleLanguages.includes("cn"))) return null;
+
                                     return (
-                                        <div key={idx} className="bg-background/40 p-2 rounded-md">
-                                            {m.gloss_cn && <div className="font-bold text-primary text-xl">{m.gloss_cn}</div>}
-                                            {enStr && <div className="text-muted-foreground">{idx + 1}. {enStr}</div>}
+                                        <div key={idx} className="bg-background/40 p-3 rounded-md space-y-1">
+                                            {m.gloss_cn && visibleLanguages.includes("cn") && (
+                                                <div className="font-bold text-primary text-xl mb-1">{m.gloss_cn}</div>
+                                            )}
+                                            <div className="text-muted-foreground leading-relaxed flex flex-wrap items-center gap-1.5">
+                                                <span className="font-medium mr-1">{idx + 1}.</span>
+                                                {m.tags && Array.isArray(m.tags) && m.tags.map((tag: string) => (
+                                                    <span key={tag} className="px-1.5 py-0.5 bg-secondary/50 text-secondary-foreground text-[10px] rounded border uppercase">
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                                {visibleGlosses.map((g, gi) => (
+                                                    <span key={gi}>
+                                                        {g}
+                                                        {gi < visibleGlosses.length - 1 ? <span className="mx-1.5 text-muted-foreground/40">·</span> : ""}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </div>
                                     );
                                 })
