@@ -71,6 +71,8 @@ export default function SearchPage() {
     const [selectedJlptLevel, setSelectedJlptLevel] = useState<string | null>(null);
     const [visibleLanguages, setVisibleLanguages] = useState<string[]>(['eng', 'cn']);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [selectedLibraryLevel, setSelectedLibraryLevel] = useState<string | null>(null);
+    const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -119,11 +121,12 @@ export default function SearchPage() {
     const myCards = useQuery(api.cards.getAllCards);
     const { speak } = useTTS();
 
-    // Filter cards by JLPT level
+    // Filter cards by JLPT level, newest first
     const filteredCards = useMemo(() => {
         if (!myCards) return [];
-        if (!selectedJlptLevel) return myCards;
-        return myCards.filter(card => card.jlptLevel === selectedJlptLevel);
+        const sorted = myCards.slice().reverse(); // newest first (Convex returns oldest first)
+        if (!selectedJlptLevel) return sorted;
+        return sorted.filter(card => card.jlptLevel === selectedJlptLevel);
     }, [myCards, selectedJlptLevel]);
 
     // Sync added state with backend data
@@ -504,24 +507,67 @@ export default function SearchPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-3 justify-center max-w-md mt-4">
-                            {['N5', 'N4', 'N3', 'N2', 'N1'].map((level) => (
-                                <Link
-                                    key={`lib-${level}`}
-                                    href={`/study?source=global&level=${level}`}
-                                    className="w-[100px]"
-                                >
+                            {['N5', 'N4', 'N3', 'N2', 'N1'].map((level) => {
+                                const savedIndex = typeof window !== 'undefined'
+                                    ? parseInt(localStorage.getItem(`libraryProgress_${level}`) || '0', 10)
+                                    : 0;
+                                return (
                                     <Button
+                                        key={`lib-${level}`}
                                         variant="outline"
-                                        className={`w-full h-12 text-lg font-medium border-2 hover:bg-muted ${getJlptColor(level)}`}
+                                        className={`w-[100px] h-12 text-lg font-medium border-2 hover:bg-muted ${getJlptColor(level)}`}
+                                        onClick={() => { setSelectedLibraryLevel(level); setLibraryDialogOpen(true); }}
                                     >
                                         {level}
                                     </Button>
-                                </Link>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {/* Library Mode Selection Dialog */}
+            <SimpleDialog
+                isOpen={libraryDialogOpen}
+                onClose={() => setLibraryDialogOpen(false)}
+                title={`${t.libraryTab} ${selectedLibraryLevel} — ${t.studyMode}`}
+            >
+                {selectedLibraryLevel && (() => {
+                    const savedIndex = typeof window !== 'undefined'
+                        ? parseInt(localStorage.getItem(`libraryProgress_${selectedLibraryLevel}`) || '0', 10)
+                        : 0;
+                    return (
+                        <div className="space-y-3 pt-2">
+                            <button
+                                className="w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition-colors space-y-1"
+                                onClick={() => {
+                                    setLibraryDialogOpen(false);
+                                    window.location.href = `/study?source=global&level=${selectedLibraryLevel}&mode=random`;
+                                }}
+                            >
+                                <div className="font-semibold">🔀 {t.studyModeRandom}</div>
+                                <div className="text-sm text-muted-foreground">{t.studyModeRandomDesc}</div>
+                            </button>
+                            <button
+                                className="w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition-colors space-y-1"
+                                onClick={() => {
+                                    setLibraryDialogOpen(false);
+                                    window.location.href = `/study?source=global&level=${selectedLibraryLevel}&mode=sequential`;
+                                }}
+                            >
+                                <div className="font-semibold">▶ {t.studyModeSequential}</div>
+                                <div className="text-sm text-muted-foreground">{t.studyModeSequentialDesc}</div>
+                                {savedIndex > 0 && (
+                                    <div className="text-xs text-primary font-medium mt-1">
+                                        {t.lastProgress}: #{savedIndex + 1}
+                                    </div>
+                                )}
+                            </button>
+                        </div>
+                    );
+                })()}
+            </SimpleDialog>
 
             {/* Detail View Dialog */}
             {selectedResult && (

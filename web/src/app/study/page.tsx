@@ -18,17 +18,28 @@ function StudyContent() {
     const router = useRouter();
     const level = searchParams.get("level") || undefined;
     const source = searchParams.get("source");
+    const mode = searchParams.get("mode") || "random"; // 'random' | 'sequential'
     const filterMode = searchParams.get("filterMode") === "true" ? true : undefined;
 
     // Convex calls (conditionally used)
-    const rawDueCards = useQuery(api.cards.getDueCards, { limit: 10, level, filterMode });
+    const rawDueCards = useQuery(api.cards.getDueCards, { limit: 100, level, filterMode });
+    const myCards = useQuery(api.cards.getAllCards, source === "global" ? {} : "skip");
     const reviewCard = useMutation(api.srs.review);
     const addCard = useMutation(api.cards.addCard);
     const { speak } = useTTS();
 
     const [cards, setCards] = useState<any[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [ratedIds, setRatedIds] = useState<Set<string>>(new Set()); // tracks SRS-rated cards
     const [addedCardIds, setAddedCardIds] = useState<Set<string>>(new Set());
+
+    // Pre-populate addedCardIds from Convex (persists across refreshes)
+    useEffect(() => {
+        if (myCards) {
+            const entSeqSet = new Set(myCards.map((c: any) => String(c.ent_seq)));
+            setAddedCardIds(entSeqSet);
+        }
+    }, [myCards]);
 
     // Global fetch state
     const [globalCards, setGlobalCards] = useState<any[] | null>(null);
@@ -63,8 +74,11 @@ function StudyContent() {
                             jlptLevel: entry.jlptLevel,
                             isGlobal: true
                         }));
-                        // Shuffle cards for a better study experience
-                        setGlobalCards(mappedCards.sort(() => Math.random() - 0.5));
+                        // Shuffle only in random mode
+                        const ordered = mode === 'sequential'
+                            ? mappedCards
+                            : mappedCards.sort(() => Math.random() - 0.5);
+                        setGlobalCards(ordered);
                     } else {
                         setGlobalCards([]);
                     }
@@ -83,32 +97,50 @@ function StudyContent() {
     useEffect(() => {
         if (activeCards) {
             setCards(activeCards);
-            setCurrentIndex(0);
+            if (mode === 'sequential' && level && source === 'global') {
+                const saved = parseInt(localStorage.getItem(`libraryProgress_${level}`) || '0', 10);
+                setCurrentIndex(Math.min(saved, activeCards.length - 1));
+            } else if (source !== 'global') {
+                // SRS: don't reset index if we already have cards (reactive re-query)
+                setCurrentIndex(prev => (cards.length === 0 ? 0 : prev));
+            } else {
+                setCurrentIndex(0);
+            }
         }
     }, [activeCards]);
 
-    const handleSwipe = async (direction: "left" | "right") => {
+    // Pure navigation — no SRS side effects
+    const handleSwipe = (direction: "left" | "right") => {
         if (direction === "right") {
-            // Go back to previous card
             setCurrentIndex(prev => Math.max(0, prev - 1));
-            return;
+        } else {
+            if (currentIndex >= cards.length - 1) return;
+            const next = currentIndex + 1;
+            setCurrentIndex(next);
+            if (source === 'global' && mode === 'sequential' && level) {
+                localStorage.setItem(`libraryProgress_${level}`, String(next));
+            }
         }
+    };
 
-        // Left swipe = advance
-        if (currentIndex >= cards.length - 1) return;
-
-        const currentCard = cards[currentIndex];
-
-        if (!currentCard.isGlobal) {
-            // SRS mode: record rating on advance (left = next)
-            await reviewCard({ cardId: currentCard._id, rating: 3 });
+    // SRS rating: record score and advance to next card
+    const handleRate = async (card: any, rating: 1 | 3) => {
+        if (ratedIds.has(card._id)) return;
+        try {
+            await reviewCard({ cardId: card._id, rating });
+            setRatedIds(prev => new Set(prev).add(card._id));
+            // Auto-advance to next card after rating
+            if (currentIndex < cards.length - 1) {
+                setCurrentIndex(prev => prev + 1);
+            }
+        } catch (e) {
+            console.error('Failed to rate card:', e);
         }
-
-        setCurrentIndex(prev => prev + 1);
     };
 
     const handleAddToMyCards = async (card: any) => {
-        if (addedCardIds.has(card._id)) return;
+        const key = String(card.ent_seq);
+        if (addedCardIds.has(key)) return;
         try {
             await addCard({
                 ent_seq: card.ent_seq,
@@ -119,7 +151,7 @@ function StudyContent() {
                 meaningIndex: 0,
                 jlptLevel: card.jlptLevel,
             });
-            setAddedCardIds(prev => new Set(prev).add(card._id));
+            setAddedCardIds(prev => new Set(prev).add(key));
         } catch (e) {
             console.error("Failed to add card:", e);
         }
@@ -294,9 +326,33 @@ function StudyContent() {
                                 </div>
                             )}
                         </div>
-                        {/* Fixed bottom bar: video button */}
-                        <div className="shrink-0 flex justify-center pt-2 pb-1 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
-                            <VideoDrawer query={currentCard.kanji || currentCard.reading || ""} />
+                        {/* Fixed bottom bar: SRS rating buttons (SRS mode only) + video button */}
+                        <div className="shrink-0 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
+                            {!currentCard.isGlobal && (
+                                <div className="flex gap-2 justify-center pt-2 pb-1 px-2">
+                                    <Button
+                                        variant={ratedIds.has(currentCard._id) ? "secondary" : "outline"}
+                                        size="sm"
+                                        className="flex-1 gap-1 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                                        onClick={() => handleRate(currentCard, 1)}
+                                        disabled={ratedIds.has(currentCard._id)}
+                                    >
+                                        ✗ {t.again}
+                                    </Button>
+                                    <Button
+                                        variant={ratedIds.has(currentCard._id) ? "secondary" : "outline"}
+                                        size="sm"
+                                        className="flex-1 gap-1 text-green-600 hover:text-green-600 border-green-600/30 hover:bg-green-600/10"
+                                        onClick={() => handleRate(currentCard, 3)}
+                                        disabled={ratedIds.has(currentCard._id)}
+                                    >
+                                        ✓ {t.good}
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="flex justify-center pt-1 pb-1">
+                                <VideoDrawer query={currentCard.kanji || currentCard.reading || ""} />
+                            </div>
                         </div>
 
                         {/* Fixed Audio Button at Bottom Right */}
@@ -320,13 +376,13 @@ function StudyContent() {
             {currentCard?.isGlobal && (
                 <div className="mt-4" onClick={(e) => e.stopPropagation()}>
                     <Button
-                        variant={addedCardIds.has(currentCard._id) ? "secondary" : "default"}
+                        variant={addedCardIds.has(String(currentCard.ent_seq)) ? "secondary" : "default"}
                         size="sm"
-                        disabled={addedCardIds.has(currentCard._id)}
+                        disabled={addedCardIds.has(String(currentCard.ent_seq))}
                         onClick={() => handleAddToMyCards(currentCard)}
                         className="shadow-sm gap-1.5"
                     >
-                        {addedCardIds.has(currentCard._id) ? `✓ ${t.added}` : `+ ${t.addToMyCards || 'Add to My Cards'}`}
+                        {addedCardIds.has(String(currentCard.ent_seq)) ? `✓ ${t.added}` : `+ ${t.addToMyCards || 'Add to My Cards'}`}
                     </Button>
                 </div>
             )}
