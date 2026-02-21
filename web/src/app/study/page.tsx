@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Flashcard } from "@/components/Flashcard";
@@ -11,19 +12,26 @@ import { VideoDrawer } from "@/components/VideoDrawer";
 import { useLanguage } from "@/app/LanguageProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
-export default function StudyPage() {
+function StudyContent() {
     const { t } = useLanguage();
-    const dueCards = useQuery(api.cards.getDueCards, { limit: 10 });
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const level = searchParams.get("level") || undefined;
+    const filterMode = searchParams.get("filterMode") === "true" ? true : undefined;
+
+    const dueCards = useQuery(api.cards.getDueCards, { limit: 10, level, filterMode });
     const reviewCard = useMutation(api.srs.review);
     const { speak } = useTTS();
 
     const [cards, setCards] = useState<any[]>([]);
+    const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         if (dueCards) {
-            setCards(dueCards);
+            // Filter out cards that we have already reviewed in this session
+            setCards(dueCards.filter((c: any) => !reviewedIds.has(c._id)));
         }
-    }, [dueCards]);
+    }, [dueCards, reviewedIds]);
 
     const handleSwipe = async (direction: "left" | "right") => {
         if (cards.length === 0) return;
@@ -31,9 +39,9 @@ export default function StudyPage() {
         const currentCard = cards[0];
         const rating = direction === "right" ? 3 : 1; // Right = Good (3), Left = Again (1)
 
-        // Optimistic update: Remove card from stack immediately
-        const nextCards = cards.slice(1);
-        setCards(nextCards);
+        // Optimistic update: Remove card from stack immediately and track its ID
+        setReviewedIds(prev => new Set(prev).add(currentCard._id));
+        setCards(prevCards => prevCards.slice(1));
 
         // Call backend
         await reviewCard({ cardId: currentCard._id, rating });
@@ -48,9 +56,30 @@ export default function StudyPage() {
 
     if (cards.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen p-4">
-                <h1 className="text-2xl font-bold mb-4">{t.noCards}</h1>
-                <Button onClick={() => window.location.href = "/Pera/search"}>{t.backToSearch}</Button>
+            <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-muted/20">
+                <div className="text-center space-y-6">
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                        {t.studyComplete}
+                    </h1>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+                        <Button
+                            variant="default"
+                            size="lg"
+                            className="shadow-sm"
+                            onClick={() => window.location.href = "/search"}
+                        >
+                            {t.backToSearch}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="lg"
+                            className="shadow-sm"
+                            onClick={() => window.location.href = "/search?tab=myCards"}
+                        >
+                            {t.backToMyCards}
+                        </Button>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -59,10 +88,34 @@ export default function StudyPage() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-muted/20 overflow-hidden relative">
-            <div className="absolute top-4 left-4">
+            <div className="absolute top-4 left-4 flex flex-wrap gap-2 z-10 max-w-[80vw]">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-background/80 backdrop-blur-sm"
+                    onClick={() => router.back()}
+                >
+                    &larr; {t.back}
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-background/80 backdrop-blur-sm hidden sm:flex"
+                    onClick={() => window.location.href = "/search"}
+                >
+                    {t.searchTab}
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-background/80 backdrop-blur-sm hidden sm:flex"
+                    onClick={() => window.location.href = "/search?tab=myCards"}
+                >
+                    {t.myCardsTab}
+                </Button>
                 <LanguageSwitcher />
             </div>
-            <div className="absolute top-4 right-4 text-sm text-muted-foreground">
+            <div className="absolute top-4 right-4 text-sm text-muted-foreground bg-background/50 px-2 py-1 rounded-md backdrop-blur-sm z-10 hidden sm:block">
                 {cards.length} {t.appName}
             </div>
 
@@ -133,5 +186,13 @@ export default function StudyPage() {
                 {t.appName}: {t.easy} (&rarr;) | {t.again} (&larr;)
             </div >
         </div >
+    );
+}
+
+export default function StudyPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">...</div>}>
+            <StudyContent />
+        </Suspense>
     );
 }

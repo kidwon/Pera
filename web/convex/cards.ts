@@ -47,7 +47,11 @@ export const seedOne = mutation({
 });
 
 export const getDueCards = query({
-    args: { limit: v.optional(v.number()) },
+    args: {
+        limit: v.optional(v.number()),
+        level: v.optional(v.union(v.string(), v.null())),
+        filterMode: v.optional(v.boolean()), // true = bypass SRS Next Review check
+    },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
         let user = null;
@@ -67,12 +71,31 @@ export const getDueCards = query({
         const now = Date.now();
         const limit = args.limit ?? 20;
 
-        const cards = await ctx.db
-            .query("cards")
-            .withIndex("by_user_next_review", (q) =>
-                q.eq("userId", user!._id).lte("next_review", now)
-            )
-            .take(limit);
+        let cardsQuery;
+
+        if (args.filterMode) {
+            // Burst Review Mode: Fetch ALL cards (either globally ALL or filtered by a specific level), ignoring SRS.
+            cardsQuery = ctx.db
+                .query("cards")
+                .withIndex("by_user", (q) => q.eq("userId", user!._id));
+
+            if (args.level) {
+                cardsQuery = cardsQuery.filter((q) => q.eq(q.field("jlptLevel"), args.level));
+            }
+        } else {
+            // SRS Mode: Default behavior, only fetch cards that are due.
+            cardsQuery = ctx.db
+                .query("cards")
+                .withIndex("by_user_next_review", (q) =>
+                    q.eq("userId", user!._id).lte("next_review", now)
+                );
+            // Even in SRS mode, allow level filtering if provided.
+            if (args.level) {
+                cardsQuery = cardsQuery.filter((q) => q.eq(q.field("jlptLevel"), args.level));
+            }
+        }
+
+        const cards = await cardsQuery.take(limit);
 
         return cards;
     },

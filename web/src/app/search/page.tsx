@@ -14,7 +14,7 @@ import { YouGlishPlayer } from "@/components/YouGlishPlayer";
 import { useLanguage } from "@/app/LanguageProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import Link from "next/link";
 interface SearchResult {
     ent_seq: string;
     kanji: string | null;
@@ -67,6 +67,15 @@ export default function SearchPage() {
     const [showVideo, setShowVideo] = useState(false);
     const [activeTab, setActiveTab] = useState("search");
     const [selectedJlptLevel, setSelectedJlptLevel] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("tab") === "myCards") {
+                setActiveTab("myCards");
+            }
+        }
+    }, []);
 
     const addCard = useMutation(api.cards.addCard);
     const removeCard = useMutation(api.cards.removeCard);
@@ -283,6 +292,13 @@ export default function SearchPage() {
                                     {level}
                                 </Button>
                             ))}
+                        </div>
+                        <div className="flex justify-center mt-3">
+                            <Link href={selectedJlptLevel ? `/study?level=${selectedJlptLevel}&filterMode=true` : '/study?filterMode=true'}>
+                                <Button className="w-full sm:w-auto shadow-sm gap-2">
+                                    {t.study} {selectedJlptLevel ? `(${selectedJlptLevel})` : ''}
+                                </Button>
+                            </Link>
                         </div>
                     </div>
 
