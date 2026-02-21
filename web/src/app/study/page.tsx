@@ -30,7 +30,8 @@ function StudyContent() {
 
     const [cards, setCards] = useState<any[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [ratedIds, setRatedIds] = useState<Set<string>>(new Set()); // tracks SRS-rated cards
+    const [ratedMap, setRatedMap] = useState<Map<string, 1 | 3>>(new Map()); // card._id -> rating
+    const [sessionDone, setSessionDone] = useState(false);
     const [addedCardIds, setAddedCardIds] = useState<Set<string>>(new Set());
 
     // Pre-populate addedCardIds from Convex (persists across refreshes)
@@ -109,28 +110,40 @@ function StudyContent() {
         }
     }, [activeCards]);
 
-    // Pure navigation — no SRS side effects
-    const handleSwipe = (direction: "left" | "right") => {
+    // Pure navigation — swipe left past last card triggers completion in SRS mode
+    const handleSwipe = async (direction: "left" | "right") => {
         if (direction === "right") {
             setCurrentIndex(prev => Math.max(0, prev - 1));
-        } else {
-            if (currentIndex >= cards.length - 1) return;
-            const next = currentIndex + 1;
-            setCurrentIndex(next);
-            if (source === 'global' && mode === 'sequential' && level) {
-                localStorage.setItem(`libraryProgress_${level}`, String(next));
-            }
+            return;
+        }
+        // Left swipe
+        if (source !== 'global' && currentIndex >= cards.length - 1) {
+            // At last SRS card: auto-rate unrated as "got it" then complete
+            const unrated = cards.filter(c => !ratedMap.has(c._id));
+            await Promise.all(unrated.map(c => reviewCard({ cardId: c._id, rating: 3 })));
+            setRatedMap(prev => {
+                const next = new Map(prev);
+                unrated.forEach(c => next.set(c._id, 3));
+                return next;
+            });
+            setSessionDone(true);
+            return;
+        }
+        if (currentIndex >= cards.length - 1) return; // global mode: stop at end
+        const next = currentIndex + 1;
+        setCurrentIndex(next);
+        if (source === 'global' && mode === 'sequential' && level) {
+            localStorage.setItem(`libraryProgress_${level}`, String(next));
         }
     };
 
-    // SRS rating: record score and advance to next card
+    // SRS rating: allow re-rating at any time
     const handleRate = async (card: any, rating: 1 | 3) => {
-        if (ratedIds.has(card._id)) return;
         try {
             await reviewCard({ cardId: card._id, rating });
-            setRatedIds(prev => new Set(prev).add(card._id));
-            // Auto-advance to next card after rating
-            if (currentIndex < cards.length - 1) {
+            setRatedMap(prev => new Map(prev).set(card._id, rating));
+            // Auto-advance only on first rating (not re-rating)
+            if (!ratedMap.has(card._id) && currentIndex < cards.length - 1) {
                 setCurrentIndex(prev => prev + 1);
             }
         } catch (e) {
@@ -161,7 +174,10 @@ function StudyContent() {
         return <div className="flex items-center justify-center min-h-screen">...</div>;
     }
 
-    if (cards.length === 0) {
+    // Show completion: either no cards due, OR sessionDone triggered
+    const studyComplete = cards.length === 0 || sessionDone;
+
+    if (studyComplete) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-muted/20">
                 <div className="text-center space-y-6">
@@ -331,20 +347,18 @@ function StudyContent() {
                             {!currentCard.isGlobal && (
                                 <div className="flex gap-2 justify-center pt-2 pb-1 px-2">
                                     <Button
-                                        variant={ratedIds.has(currentCard._id) ? "secondary" : "outline"}
+                                        variant={ratedMap.get(currentCard._id) === 1 ? "destructive" : "outline"}
                                         size="sm"
                                         className="flex-1 gap-1 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
                                         onClick={() => handleRate(currentCard, 1)}
-                                        disabled={ratedIds.has(currentCard._id)}
                                     >
                                         ✗ {t.again}
                                     </Button>
                                     <Button
-                                        variant={ratedIds.has(currentCard._id) ? "secondary" : "outline"}
+                                        variant={ratedMap.get(currentCard._id) === 3 ? "default" : "outline"}
                                         size="sm"
                                         className="flex-1 gap-1 text-green-600 hover:text-green-600 border-green-600/30 hover:bg-green-600/10"
                                         onClick={() => handleRate(currentCard, 3)}
-                                        disabled={ratedIds.has(currentCard._id)}
                                     >
                                         ✓ {t.good}
                                     </Button>
