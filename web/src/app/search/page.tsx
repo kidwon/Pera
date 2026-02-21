@@ -20,7 +20,8 @@ interface SearchResult {
     kanji: string | null;
     reading: string | null;
     meanings: {
-        gloss: string;
+        gloss?: string;
+        glosses: Record<string, string[]>;
         gloss_cn?: string | null;
         examples?: {
             text: string;
@@ -135,7 +136,15 @@ export default function SearchPage() {
                 ent_seq: result.ent_seq,
                 kanji: result.kanji,
                 reading: result.reading,
-                meanings: [result.meanings[meaningIndex]], // Single meaning
+                meanings: [
+                    {
+                        // Pass the raw string from Convex if it exists for backwards compat, otherwise fallback to english map value or empty string
+                        gloss: (result.meanings[meaningIndex] as any).gloss || (result.meanings[meaningIndex].glosses && result.meanings[meaningIndex].glosses["eng"] ? result.meanings[meaningIndex].glosses["eng"].join("; ") : ""),
+                        glosses: result.meanings[meaningIndex].glosses || {},
+                        gloss_cn: result.meanings[meaningIndex].gloss_cn ?? undefined,
+                        examples: result.meanings[meaningIndex].examples || [],
+                    }
+                ],
                 pitch: result.pitch ?? undefined,
                 meaningIndex: meaningIndex,
                 jlptLevel: result.jlptLevel,
@@ -177,9 +186,10 @@ export default function SearchPage() {
             </div>
 
             <Tabs defaultValue="search" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsList className="grid w-full grid-cols-3 mb-4">
                     <TabsTrigger value="search">{t.searchTab}</TabsTrigger>
                     <TabsTrigger value="myCards">{t.myCardsTab}</TabsTrigger>
+                    <TabsTrigger value="library">{t.libraryTab}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="search" className="mt-0">
@@ -254,13 +264,16 @@ export default function SearchPage() {
                                             </div>
                                         </div>
                                         <div className="text-sm text-muted-foreground line-clamp-2">
-                                            {result.meanings.map((m, i) => (
-                                                <span key={i}>
-                                                    {m.gloss_cn ? <span className="text-primary/80 font-medium">[{m.gloss_cn}] </span> : null}
-                                                    {m.gloss}
-                                                    {i < result.meanings.length - 1 ? "; " : ""}
-                                                </span>
-                                            ))}
+                                            {result.meanings.map((m, i) => {
+                                                const enGlosses = m.glosses && m.glosses["eng"] ? m.glosses["eng"].join("; ") : m.gloss;
+                                                return (
+                                                    <span key={i}>
+                                                        {m.gloss_cn ? <span className="text-primary/80 font-medium">[{m.gloss_cn}] </span> : null}
+                                                        {enGlosses}
+                                                        {i < result.meanings.length - 1 && enGlosses ? "; " : ""}
+                                                    </span>
+                                                );
+                                            })}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -360,14 +373,16 @@ export default function SearchPage() {
                                                     </Button>
                                                 </div>
                                                 <div className="text-sm text-muted-foreground">
-                                                    {card.meanings.map((m, i) => (
-                                                        <span key={i}>
-                                                            {/* @ts-ignore */}
-                                                            {m.gloss_cn ? <span className="text-primary/80 font-medium">[{m.gloss_cn}] </span> : null}
-                                                            {m.gloss}
-                                                            {i < card.meanings.length - 1 ? "; " : ""}
-                                                        </span>
-                                                    ))}
+                                                    {card.meanings.map((m: any, i: number) => {
+                                                        const enStr = m.glosses && m.glosses.eng ? m.glosses.eng.join("; ") : "";
+                                                        return (
+                                                            <span key={i}>
+                                                                {m.gloss_cn ? <span className="text-primary/80 font-medium">[{m.gloss_cn}] </span> : null}
+                                                                {enStr}
+                                                                {i < card.meanings.length - 1 && enStr ? "; " : ""}
+                                                            </span>
+                                                        );
+                                                    })}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -375,6 +390,34 @@ export default function SearchPage() {
                                 ))}
                             </AnimatePresence>
                         </motion.div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="library" className="mt-0">
+                    <div className="flex flex-col items-center justify-center py-12 space-y-6">
+                        <div className="text-center space-y-2">
+                            <h2 className="text-2xl font-bold">Global JLPT Library</h2>
+                            <p className="text-muted-foreground max-w-sm">
+                                Study all words for a specific JLPT level. Words you mark as difficult will automatically be added to your My Cards collection.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 justify-center max-w-md mt-4">
+                            {['N5', 'N4', 'N3', 'N2', 'N1'].map((level) => (
+                                <Link
+                                    key={`lib-${level}`}
+                                    href={`/study?source=global&level=${level}`}
+                                    className="w-[100px]"
+                                >
+                                    <Button
+                                        variant="outline"
+                                        className={`w-full h-12 text-lg font-medium border-2 hover:bg-muted ${getJlptColor(level)}`}
+                                    >
+                                        {level}
+                                    </Button>
+                                </Link>
+                            ))}
+                        </div>
                     </div>
                 </TabsContent>
             </Tabs>
@@ -429,7 +472,7 @@ export default function SearchPage() {
                                                     </div>
                                                 )}
                                                 <div className="text-muted-foreground">
-                                                    {index + 1}. {meaning.gloss}
+                                                    {index + 1}. {(meaning.glosses && meaning.glosses["eng"] ? meaning.glosses["eng"].join("; ") : meaning.gloss) || ""}
                                                 </div>
                                             </div>
                                             <Button

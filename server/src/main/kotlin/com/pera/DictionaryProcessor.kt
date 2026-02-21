@@ -42,7 +42,7 @@ data class Reading(
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class Sense(
     @JacksonXmlElementWrapper(useWrapping = false)
-    val gloss: List<String>? = null,
+    val gloss: List<Gloss>? = null,
     @JacksonXmlElementWrapper(useWrapping = false)
     val example: List<Example>? = null,
     @JacksonXmlElementWrapper(useWrapping = false)
@@ -53,6 +53,15 @@ data class Sense(
 data class Example(
     val ex_text: String,
     val ex_text_ja: String
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class Gloss(
+    @JacksonXmlProperty(isAttribute = true, localName = "lang", namespace = "http://www.w3.org/XML/1998/namespace")
+    val lang: String? = null,
+    
+    @JacksonXmlText
+    val text: String
 )
 
 // Simplified output for the frontend
@@ -68,7 +77,8 @@ data class SimplifiedEntry(
 
 @Serializable
 data class MeaningDetail(
-    val gloss: String,
+    val gloss: String? = null, // Legacy compatibility
+    val glosses: Map<String, List<String>> = emptyMap(), // { "eng": ["cat"], "dut": ["kat"] }
     val gloss_cn: String? = null, // Chinese definition
     val examples: List<ExamplePair> = emptyList()
 )
@@ -283,7 +293,7 @@ class DictionaryProcessor {
                     reading = custom.reading,
                     meanings = custom.meanings.mapIndexed { index, gloss -> 
                         MeaningDetail(
-                            gloss = gloss, 
+                            glosses = mapOf("eng" to listOf(gloss)), 
                             gloss_cn = custom.chinese_meanings.getOrNull(index) ?: custom.chinese_meanings.firstOrNull(), 
                             examples = emptyList()
                         ) 
@@ -325,14 +335,24 @@ class DictionaryProcessor {
 
     private fun convertSensesToMeanings(senses: List<Sense>, chineseGloss: String?): List<MeaningDetail> {
         return senses.mapIndexed { index, sense ->
-            val glossText = sense.gloss?.joinToString("; ") ?: ""
+            // Group glosses by language 
+            val glossMap = mutableMapOf<String, MutableList<String>>()
+            
+            sense.gloss?.forEach { g ->
+                val lang = g.lang ?: "eng" // JMdict defaults to eng if omitted
+                if (!glossMap.containsKey(lang)) {
+                    glossMap[lang] = mutableListOf()
+                }
+                glossMap[lang]!!.add(g.text)
+            }
+            
             val examples = sense.example?.map { ex ->
                 ExamplePair(text = ex.ex_text, text_ja = ex.ex_text_ja)
             } ?: emptyList()
             
             // Only attach Chinese gloss to the first sense (primary meaning)
             val cn = if (index == 0) chineseGloss else null
-            MeaningDetail(gloss = glossText, gloss_cn = cn, examples = examples)
+            MeaningDetail(glosses = glossMap, gloss_cn = cn, examples = examples)
         }
     }
 
@@ -369,10 +389,10 @@ class DictionaryProcessor {
             val finalScore = maxOf(score, normalizedScore)
             
             // DEBUG: Print details if this entry is relevant
-            if ((q.contains("麦当劳") || q.contains("mcdonald")) && (entry.kanji?.contains("麦当劳") == true || entry.meanings.any { it.gloss.lowercase().contains("mcdonald") || it.gloss_cn?.contains("麦当劳") == true })) {
+            if ((q.contains("麦当劳") || q.contains("mcdonald")) && (entry.kanji?.contains("麦当劳") == true || entry.meanings.any { m -> (m.glosses.values.flatten().any { it.lowercase().contains("mcdonald") } || m.gloss?.lowercase()?.contains("mcdonald") == true) || m.gloss_cn?.contains("麦当劳") == true })) {
                 println("   👉 Checking Entry: ${entry.kanji} (${entry.reading})")
                 println("      Score: $score (Original), $normalizedScore (Normalized)")
-                println("      Meanings: ${entry.meanings.joinToString { "${it.gloss}|${it.gloss_cn}" }}")
+                println("      Meanings: ${entry.meanings.joinToString { "${if(it.glosses.isNotEmpty()) it.glosses.values.flatten().joinToString() else it.gloss}|${it.gloss_cn}" }}")
             }
 
             if (finalScore > 0) entry to finalScore else null
@@ -399,8 +419,8 @@ class DictionaryProcessor {
         // 2. Check Meanings (Normal Weight: x1)
         var maxMeaningScore = 0
         for (meaning in entry.meanings) {
-            val gloss = meaning.gloss.lowercase()
-            maxMeaningScore = maxOf(maxMeaningScore, getMatchScore(gloss, query))
+            val glossStr = if (meaning.glosses.isNotEmpty()) meaning.glosses.values.flatten().joinToString("; ").lowercase() else meaning.gloss?.lowercase() ?: ""
+            maxMeaningScore = maxOf(maxMeaningScore, getMatchScore(glossStr, query))
             
             // 2b. Check Chinese Meanings (Boost for non-ASCII queries)
             val glossCn = meaning.gloss_cn?.lowercase()

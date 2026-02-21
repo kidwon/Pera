@@ -17,21 +17,63 @@ function StudyContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const level = searchParams.get("level") || undefined;
+    const source = searchParams.get("source");
     const filterMode = searchParams.get("filterMode") === "true" ? true : undefined;
 
-    const dueCards = useQuery(api.cards.getDueCards, { limit: 10, level, filterMode });
+    // Convex calls (conditionally used)
+    const rawDueCards = useQuery(api.cards.getDueCards, { limit: 10, level, filterMode });
     const reviewCard = useMutation(api.srs.review);
+    const addCard = useMutation(api.cards.addCard);
     const { speak } = useTTS();
 
     const [cards, setCards] = useState<any[]>([]);
     const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
 
+    // Global fetch state
+    const [globalCards, setGlobalCards] = useState<any[] | null>(null);
+
     useEffect(() => {
-        if (dueCards) {
-            // Filter out cards that we have already reviewed in this session
-            setCards(dueCards.filter((c: any) => !reviewedIds.has(c._id)));
+        if (source === "global" && level) {
+            const fetchGlobal = async () => {
+                try {
+                    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
+                    const res = await fetch(`${baseUrl}/api/dictionary/level?level=${level}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        // Map the Ktor payload to look similar enough to a Convex card for our UI
+                        const mappedCards = data.map((entry: any, index: number) => ({
+                            _id: `global_${entry.ent_seq}_${index}`,
+                            ent_seq: entry.ent_seq,
+                            kanji: entry.kanji,
+                            reading: entry.reading,
+                            meanings: entry.meanings,
+                            pitch: entry.pitch,
+                            jlptLevel: entry.jlptLevel,
+                            isGlobal: true
+                        }));
+                        // Shuffle cards for a better study experience
+                        setGlobalCards(mappedCards.sort(() => Math.random() - 0.5));
+                    } else {
+                        setGlobalCards([]);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch global library:", e);
+                    setGlobalCards([]);
+                }
+            };
+            fetchGlobal();
         }
-    }, [dueCards, reviewedIds]);
+    }, [source, level]);
+
+    // Determine the active data source
+    const activeCards = source === "global" ? globalCards : rawDueCards;
+
+    useEffect(() => {
+        if (activeCards) {
+            // Filter out cards that we have already reviewed in this session
+            setCards(activeCards.filter((c: any) => !reviewedIds.has(c._id)));
+        }
+    }, [activeCards, reviewedIds]);
 
     const handleSwipe = async (direction: "left" | "right") => {
         if (cards.length === 0) return;
@@ -43,14 +85,33 @@ function StudyContent() {
         setReviewedIds(prev => new Set(prev).add(currentCard._id));
         setCards(prevCards => prevCards.slice(1));
 
-        // Call backend
-        await reviewCard({ cardId: currentCard._id, rating });
-
-        // If "Again", maybe re-queue it at the end? 
-        // For now, simpler to just proceed.
+        if (currentCard.isGlobal) {
+            // Global Mode Logic
+            // If they swipe left (rating 1 == Again/Hard), it means they don't know it well. 
+            // Automatically silently save it to their Convex collection!
+            if (rating === 1) {
+                try {
+                    await addCard({
+                        ent_seq: currentCard.ent_seq,
+                        kanji: currentCard.kanji,
+                        reading: currentCard.reading,
+                        meanings: currentCard.meanings,
+                        pitch: currentCard.pitch,
+                        meaningIndex: 0, // Assume primary meaning
+                        jlptLevel: currentCard.jlptLevel,
+                    });
+                    console.log(`Saved ${currentCard.kanji || currentCard.reading} from global library to your cards context.`);
+                } catch (e) {
+                    console.error("Failed to auto-save global card:", e);
+                }
+            }
+        } else {
+            // Standard SRS Mode Logic
+            await reviewCard({ cardId: currentCard._id, rating });
+        }
     };
 
-    if (!dueCards) {
+    if (!activeCards) {
         return <div className="flex items-center justify-center min-h-screen">...</div>;
     }
 
@@ -144,8 +205,20 @@ function StudyContent() {
                         {currentCard.kanji && currentCard.reading && (
                             <div className="text-xl text-muted-foreground">{currentCard.reading}</div>
                         )}
-                        <div className="text-lg text-center">
-                            {currentCard.meanings?.map((m: any) => m.gloss).join("; ") || "No meanings available"}
+                        <div className="text-lg text-left w-full space-y-2 px-4">
+                            {currentCard.meanings?.length > 0 ? (
+                                currentCard.meanings.map((m: any, idx: number) => {
+                                    const enStr = (m.glosses && m.glosses.eng ? m.glosses.eng.join("; ") : m.gloss) || "";
+                                    return (
+                                        <div key={idx} className="bg-background/40 p-2 rounded-md">
+                                            {m.gloss_cn && <div className="font-bold text-primary text-xl">{m.gloss_cn}</div>}
+                                            {enStr && <div className="text-muted-foreground">{idx + 1}. {enStr}</div>}
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="text-center text-muted-foreground">No meanings available</div>
+                            )}
                         </div>
                         {currentCard.meanings?.some((m: any) => m.examples?.length > 0) && (
                             <div className="mt-4 text-sm text-left w-full bg-background/50 p-3 rounded-md">

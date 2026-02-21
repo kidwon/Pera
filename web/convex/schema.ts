@@ -14,7 +14,9 @@ export default defineSchema({
         reading: v.union(v.string(), v.null()),
         meanings: v.array(
             v.object({
-                gloss: v.string(),
+                gloss: v.optional(v.string()), // Legacy compatibility
+                glosses: v.optional(v.record(v.string(), v.array(v.string()))), // { "eng": ["..."], "ger": ["..."] }
+                gloss_cn: v.optional(v.string()), // Chinese definition if available
                 examples: v.optional(
                     v.array(
                         v.object({

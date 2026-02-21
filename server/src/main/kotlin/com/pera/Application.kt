@@ -129,5 +129,16 @@ fun Application.configureRouting() {
                 call.respond(results)
             }
         }
+        get("/api/dictionary/level") {
+            val level = call.request.queryParameters["level"]?.uppercase() ?: ""
+            if (level.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing level parameter"))
+                return@get
+            }
+            
+            // Filter global dictionary by JLPT level
+            val levelEntries = dictionaryEntries.filter { it.jlptLevel == level }
+            call.respond(levelEntries)
+        }
     }
 }

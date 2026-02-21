@@ -33,7 +33,7 @@ export const seedOne = mutation({
             ent_seq: "test_" + Date.now(),
             kanji: "テスト",
             reading: "てすと",
-            meanings: [{ gloss: "test" }],
+            meanings: [{ glosses: { eng: ["test"] } }],
             pitch: "0",
             jlptLevel: "N5",
             meaningIndex: 0,
@@ -109,7 +109,9 @@ export const addCard = mutation({
         meanings: v.optional(
             v.array(
                 v.object({
-                    gloss: v.string(),
+                    gloss: v.optional(v.string()), // Legacy compatibility
+                    glosses: v.optional(v.record(v.string(), v.array(v.string()))),
+                    gloss_cn: v.optional(v.string()),
                     examples: v.optional(
                         v.array(
                             v.object({
@@ -210,7 +212,9 @@ export const seed = mutation({
                             kanji: typeof rawCard.kanji === 'string' ? rawCard.kanji : null,
                             reading: typeof rawCard.reading === 'string' ? rawCard.reading : null,
                             meanings: Array.isArray(rawCard.meanings) ? rawCard.meanings.map((m: any) => ({
-                                gloss: String(m.gloss || "no gloss"),
+                                gloss: typeof m.gloss === 'string' ? m.gloss : undefined,
+                                glosses: m.glosses || {},
+                                gloss_cn: typeof m.gloss_cn === 'string' ? m.gloss_cn : undefined,
                                 examples: Array.isArray(m.examples) ? m.examples.map((ex: any) => ({
                                     text: String(ex.text || ""),
                                     text_ja: String(ex.text_ja || ""),
